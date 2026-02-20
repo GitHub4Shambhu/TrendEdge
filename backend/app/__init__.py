@@ -1,0 +1,1 @@
+"""TrendEdge Backend Application."""
