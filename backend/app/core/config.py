@@ -32,8 +32,12 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://postgres:password@localhost:5432/trendedge"
     redis_url: str = "redis://localhost:6379/0"
 
-    # CORS
-    cors_origins: List[str] = ["http://localhost:3000"]
+    # CORS - Allow Render frontend and localhost for development
+    cors_origins: List[str] = [
+        "http://localhost:3000",
+        "https://trendedge-frontend.onrender.com",
+        "https://*.onrender.com",
+    ]
 
     # Momentum Algorithm Settings
     momentum_lookback_days: int = 20

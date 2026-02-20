@@ -5,7 +5,8 @@
  * All API calls go through this module for consistency.
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+// Use environment variable for API URL, with fallback for local development
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000") + "/api/v1";
 
 export interface MomentumScore {
   symbol: string;
