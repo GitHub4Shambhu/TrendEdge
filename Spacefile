@@ -1,0 +1,14 @@
+# Deta Space Configuration
+# Deploy with: space push
+
+v: 0
+micros:
+  - name: api
+    src: backend
+    engine: python3.11
+    primary: true
+    run: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    presets:
+      env:
+        - name: ENVIRONMENT
+          default: "production"
