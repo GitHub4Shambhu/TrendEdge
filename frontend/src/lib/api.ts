@@ -38,6 +38,37 @@ export interface DashboardData {
   last_updated: string;
 }
 
+// ── Max Risk Momentum Types ─────────────────────────────────────
+
+export interface MaxRiskScoreResult {
+  symbol: string;
+  rank: number;
+  price: number;
+  return_3m: number;
+  return_6m: number;
+  return_12m: number;
+  breakout_factor: number;
+  is_20d_high: boolean;
+  vol_accel: number;
+  sma_50: number;
+  sma_200: number;
+  price_to_200dma: number;
+  max_risk_score: number;
+  turbo_score: number;
+  below_50dma: boolean;
+  stop_price: number;
+  signal: string;
+  timestamp: string;
+}
+
+export interface MaxRiskPortfolioResponse {
+  top_picks: MaxRiskScoreResult[];
+  full_ranking: MaxRiskScoreResult[];
+  use_turbo: boolean;
+  scanned_at: string;
+  total_scanned: number;
+}
+
 class APIClient {
   private baseUrl: string;
 
@@ -94,6 +125,41 @@ class APIClient {
   async healthCheck(): Promise<{ status: string; version: string }> {
     const response = await fetch(`${this.baseUrl.replace("/api/v1", "")}/health`);
     return response.json();
+  }
+
+  // ── Max Risk Momentum Methods ───────────────────────────────
+
+  /**
+   * Get Max Risk portfolio (top picks + full ranking)
+   */
+  async getMaxRiskPortfolio(
+    topN: number = 5,
+    useTurbo: boolean = false
+  ): Promise<MaxRiskPortfolioResponse> {
+    return this.fetch<MaxRiskPortfolioResponse>(
+      `/dashboard/max-risk-portfolio?top_n=${topN}&use_turbo=${useTurbo}`
+    );
+  }
+
+  /**
+   * Get Max Risk scan (ranked list)
+   */
+  async getMaxRiskScan(
+    limit: number = 20,
+    useTurbo: boolean = false
+  ): Promise<MaxRiskScoreResult[]> {
+    return this.fetch<MaxRiskScoreResult[]>(
+      `/dashboard/max-risk-scan?limit=${limit}&use_turbo=${useTurbo}`
+    );
+  }
+
+  /**
+   * Get Max Risk analysis for a single symbol
+   */
+  async getMaxRiskAnalysis(symbol: string): Promise<MaxRiskScoreResult> {
+    return this.fetch<MaxRiskScoreResult>(
+      `/dashboard/max-risk-analyze/${symbol}`
+    );
   }
 }
 

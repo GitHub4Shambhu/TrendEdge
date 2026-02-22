@@ -20,12 +20,15 @@ from app.schemas.momentum import (
     BacktestResponse,
     TradeResult,
     DailySnapshotResult,
+    MaxRiskScoreResult,
+    MaxRiskPortfolioResponse,
 )
 from app.services.momentum_service import get_momentum_service
 from app.services.sentiment_service import get_sentiment_service
 from app.services.advanced_momentum import get_momentum_algorithm, MomentumFactors
 from app.services.stock_universe import get_quick_scan_universe, get_sector_etfs
 from app.services.backtesting import get_backtesting_engine, BacktestConfig
+from app.services.max_risk_momentum import get_max_risk_engine, MaxRiskFactors
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -599,3 +602,110 @@ async def get_backtest_presets():
             "etfs": ["SPY", "QQQ", "IWM", "DIA", "XLK", "XLF", "XLE", "XLV", "XLI", "XLY"],
         }
     }
+
+
+# ============================================================================
+# Max Risk Momentum Endpoints
+# ============================================================================
+
+def _factors_to_max_risk_result(factors: MaxRiskFactors) -> MaxRiskScoreResult:
+    """Convert MaxRiskFactors dataclass to Pydantic schema."""
+    return MaxRiskScoreResult(
+        symbol=factors.symbol,
+        rank=factors.rank,
+        price=factors.price,
+        return_3m=factors.return_3m,
+        return_6m=factors.return_6m,
+        return_12m=factors.return_12m,
+        breakout_factor=factors.breakout_factor,
+        is_20d_high=factors.is_20d_high,
+        vol_accel=factors.vol_accel,
+        sma_50=factors.sma_50,
+        sma_200=factors.sma_200,
+        price_to_200dma=factors.price_to_200dma,
+        max_risk_score=factors.max_risk_score,
+        turbo_score=factors.turbo_score,
+        below_50dma=factors.below_50dma,
+        stop_price=factors.stop_price,
+        signal=factors.signal,
+        timestamp=factors.timestamp,
+    )
+
+
+@router.get("/max-risk-scan", response_model=List[MaxRiskScoreResult])
+async def max_risk_scan(
+    limit: int = Query(20, ge=1, le=100, description="Number of results"),
+    use_turbo: bool = Query(False, description="Rank by TurboScore instead of MaxRiskScore"),
+):
+    """
+    Scan the market using the Max Risk Momentum formula.
+
+    MaxRiskScore = (0.35·R3) + (0.30·R6) + (0.20·R12) + (0.10·BO) + (0.05·VolAccel)
+    TurboScore  = MaxRiskScore × (Price / 200DMA)
+
+    Returns ranked list of stocks sorted by score descending.
+    """
+    engine = get_max_risk_engine()
+    symbols = get_quick_scan_universe()
+
+    all_factors = await engine.scan_universe(symbols)
+
+    if use_turbo:
+        all_factors.sort(key=lambda f: f.turbo_score, reverse=True)
+    else:
+        all_factors.sort(key=lambda f: f.max_risk_score, reverse=True)
+
+    for i, f in enumerate(all_factors):
+        f.rank = i + 1
+
+    return [_factors_to_max_risk_result(f) for f in all_factors[:limit]]
+
+
+@router.get("/max-risk-portfolio", response_model=MaxRiskPortfolioResponse)
+async def max_risk_portfolio(
+    top_n: int = Query(5, ge=1, le=20, description="Number of top picks"),
+    use_turbo: bool = Query(False, description="Use TurboScore for ranking"),
+):
+    """
+    Get the Max Risk momentum portfolio — top picks for aggressive momentum.
+
+    Selection rules:
+    - Scan full universe
+    - Filter: avg daily $ volume > $50M
+    - Rank by MaxRiskScore (or TurboScore)
+    - Return top N picks (equal weight)
+    - Exit: Drop out of top 10, close < 50DMA, or -15% hard stop
+    """
+    engine = get_max_risk_engine()
+    symbols = get_quick_scan_universe()
+
+    top_picks = await engine.get_top_picks(symbols, top_n=top_n, use_turbo=use_turbo)
+    all_factors = await engine.scan_universe(symbols)
+
+    if use_turbo:
+        all_factors.sort(key=lambda f: f.turbo_score, reverse=True)
+
+    for i, f in enumerate(all_factors):
+        f.rank = i + 1
+
+    return MaxRiskPortfolioResponse(
+        top_picks=[_factors_to_max_risk_result(f) for f in top_picks],
+        full_ranking=[_factors_to_max_risk_result(f) for f in all_factors[:30]],
+        use_turbo=use_turbo,
+        total_scanned=len(all_factors),
+    )
+
+
+@router.get("/max-risk-analyze/{symbol}", response_model=MaxRiskScoreResult)
+async def max_risk_analyze_symbol(symbol: str):
+    """
+    Get Max Risk Momentum analysis for a single symbol.
+    """
+    engine = get_max_risk_engine()
+    factors = await engine.analyze_single(symbol.upper())
+
+    if factors is None:
+        raise HTTPException(status_code=404, detail=f"Could not analyze symbol: {symbol}")
+
+    factors.rank = 1
+    return _factors_to_max_risk_result(factors)

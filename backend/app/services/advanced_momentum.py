@@ -441,11 +441,13 @@ class AdvancedMomentumAlgorithm:
         random.seed(hash(symbol) % 2**32)
         np.random.seed(hash(symbol) % 2**32)
         
-        # Base prices for known symbols
+        # Base prices for known symbols (approx Feb 2026)
         base_prices = {
-            "AAPL": 185, "MSFT": 420, "GOOGL": 175, "AMZN": 195, "NVDA": 875,
-            "META": 510, "TSLA": 248, "AMD": 178, "NFLX": 625, "CRM": 285,
-            "SPY": 528, "QQQ": 485, "IWM": 205, "ARKK": 52, "XLK": 210,
+            "AAPL": 245, "MSFT": 415, "GOOGL": 185, "AMZN": 230, "NVDA": 138,
+            "META": 700, "TSLA": 355, "AMD": 118, "NFLX": 1050, "CRM": 340,
+            "SPY": 610, "QQQ": 540, "IWM": 230, "ARKK": 60, "XLK": 240,
+            "AVGO": 230, "PLTR": 120, "COIN": 270, "ARM": 175, "CRWD": 390,
+            "PANW": 205, "NET": 145, "ADBE": 440, "ORCL": 185, "INTC": 22,
         }
         base_price = base_prices.get(symbol, 100 + random.random() * 200)
         

@@ -9,4 +9,5 @@ export { OpportunityCard } from "./OpportunityCard";
 export { SentimentGauge } from "./SentimentGauge";
 export { StockComparison } from "./StockComparison";
 export { default as Backtesting } from "./Backtesting";
+export { default as MaxRiskMomentum } from "./MaxRiskMomentum";
 export type { StockPerformanceData } from "./StockComparison";

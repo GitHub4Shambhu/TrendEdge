@@ -12,6 +12,7 @@ import { OpportunityCard } from "@/components/OpportunityCard";
 import { SentimentGauge } from "@/components/SentimentGauge";
 import { StockComparison } from "@/components/StockComparison";
 import Backtesting from "@/components/Backtesting";
+import MaxRiskMomentum from "@/components/MaxRiskMomentum";
 import { formatRelativeTime } from "@/lib/utils";
 
 // Mock data for development when backend is not running
@@ -25,7 +26,7 @@ const MOCK_DATA: DashboardData = {
         score: 0.72,
         signal: "buy",
         confidence: 0.85,
-        price: 875.32,
+        price: 138.40,
         price_change_pct: 3.24,
         volume_ratio: 1.8,
         sentiment_score: 0.65,
@@ -33,18 +34,18 @@ const MOCK_DATA: DashboardData = {
       },
       reason: "Strong bullish momentum, high volume surge, positive social sentiment",
       risk_level: "low",
-      target_price: 919.09,
-      stop_loss: 849.06,
+      target_price: 152.24,
+      stop_loss: 131.48,
     },
     {
       rank: 2,
       momentum: {
-        symbol: "AMD",
+        symbol: "META",
         asset_type: "stock",
         score: 0.58,
         signal: "buy",
         confidence: 0.78,
-        price: 178.45,
+        price: 700.25,
         price_change_pct: 2.15,
         volume_ratio: 1.5,
         sentiment_score: 0.42,
@@ -52,8 +53,8 @@ const MOCK_DATA: DashboardData = {
       },
       reason: "Moderate bullish momentum, above average volume",
       risk_level: "medium",
-      target_price: 187.37,
-      stop_loss: 173.10,
+      target_price: 735.26,
+      stop_loss: 679.24,
     },
     {
       rank: 3,
@@ -63,7 +64,7 @@ const MOCK_DATA: DashboardData = {
         score: 0.45,
         signal: "buy",
         confidence: 0.72,
-        price: 248.92,
+        price: 355.00,
         price_change_pct: 1.87,
         volume_ratio: 1.3,
         sentiment_score: 0.38,
@@ -71,8 +72,8 @@ const MOCK_DATA: DashboardData = {
       },
       reason: "Moderate bullish momentum",
       risk_level: "medium",
-      target_price: 261.37,
-      stop_loss: 241.45,
+      target_price: 372.75,
+      stop_loss: 344.35,
     },
   ],
   top_etfs: [
@@ -84,7 +85,7 @@ const MOCK_DATA: DashboardData = {
         score: 0.48,
         signal: "buy",
         confidence: 0.82,
-        price: 485.67,
+        price: 540.20,
         price_change_pct: 1.42,
         volume_ratio: 1.2,
         sentiment_score: 0.35,
@@ -92,8 +93,8 @@ const MOCK_DATA: DashboardData = {
       },
       reason: "Moderate bullish momentum, tech sector strength",
       risk_level: "low",
-      target_price: 509.95,
-      stop_loss: 471.10,
+      target_price: 567.21,
+      stop_loss: 524.00,
     },
     {
       rank: 2,
@@ -103,7 +104,7 @@ const MOCK_DATA: DashboardData = {
         score: 0.35,
         signal: "buy",
         confidence: 0.80,
-        price: 528.34,
+        price: 610.50,
         price_change_pct: 0.95,
         volume_ratio: 1.1,
         sentiment_score: 0.28,
@@ -111,8 +112,8 @@ const MOCK_DATA: DashboardData = {
       },
       reason: "Moderate bullish momentum, broad market strength",
       risk_level: "low",
-      target_price: 554.76,
-      stop_loss: 512.49,
+      target_price: 641.03,
+      stop_loss: 592.19,
     },
   ],
   top_options: [],
@@ -284,6 +285,15 @@ export function Dashboard() {
           Performance Comparison
         </h2>
         <StockComparison momentumStocks={data.top_stocks} />
+      </section>
+
+      {/* Max Risk Momentum Score */}
+      <section>
+        <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-red-500" />
+          Max Risk Momentum Score
+        </h2>
+        <MaxRiskMomentum />
       </section>
 
       {/* Top ETFs */}

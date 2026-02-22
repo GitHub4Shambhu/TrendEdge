@@ -148,11 +148,57 @@ class BacktestResponse(BaseModel):
     start_date: datetime
     end_date: datetime
     trading_days: int
-    
+
     # Detailed data
-    trades: List[TradeResult]
-    daily_snapshots: List[DailySnapshotResult]
-    
+    trades: List[TradeResult] = Field(default_factory=list)
+    daily_snapshots: List[DailySnapshotResult] = Field(default_factory=list)
+
     # Equity curve for charting
     equity_curve: List[float] = Field(default_factory=list)
     dates: List[str] = Field(default_factory=list)
+
+
+# ============================================================================
+# Max Risk Momentum Schemas
+# ============================================================================
+
+class MaxRiskScoreResult(BaseModel):
+    """Max Risk Momentum Score for a single symbol."""
+    symbol: str = Field(..., description="Ticker symbol")
+    rank: int = Field(..., ge=1, description="Rank by score")
+    price: float = Field(..., description="Current price")
+
+    # Raw returns
+    return_3m: float = Field(..., description="3-month raw return %")
+    return_6m: float = Field(..., description="6-month raw return %")
+    return_12m: float = Field(..., description="12-month raw return %")
+
+    # Factors
+    breakout_factor: float = Field(..., description="20-day breakout factor (0-1)")
+    is_20d_high: bool = Field(False, description="At 20-day high?")
+    vol_accel: float = Field(..., description="Volume acceleration (5D/50D)")
+
+    # Moving averages
+    sma_50: float = Field(..., description="50-day SMA")
+    sma_200: float = Field(..., description="200-day SMA")
+    price_to_200dma: float = Field(..., description="Price / 200DMA ratio")
+
+    # Scores
+    max_risk_score: float = Field(..., description="Raw MaxRiskScore")
+    turbo_score: float = Field(..., description="TurboScore with convexity bias")
+
+    # Exit conditions
+    below_50dma: bool = Field(False, description="Close below 50DMA")
+    stop_price: float = Field(..., description="-15% hard stop price")
+
+    signal: str = Field(..., description="BUY / SELL / HOLD")
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+
+class MaxRiskPortfolioResponse(BaseModel):
+    """Max Risk portfolio with top picks and full scan."""
+    top_picks: List[MaxRiskScoreResult] = Field(default_factory=list, description="Top 5 picks to buy")
+    full_ranking: List[MaxRiskScoreResult] = Field(default_factory=list, description="Full ranked list")
+    use_turbo: bool = Field(False, description="Whether TurboScore was used for ranking")
+    scanned_at: datetime = Field(default_factory=datetime.utcnow)
+    total_scanned: int = Field(0, description="Total symbols scanned")
