@@ -44,9 +44,15 @@ export interface MaxRiskScoreResult {
   symbol: string;
   rank: number;
   price: number;
+  r1w: number;
+  r1m: number;
   return_3m: number;
   return_6m: number;
   return_12m: number;
+  rs3m: number;
+  rs6m: number;
+  rs12m: number;
+  vexp: number;
   breakout_factor: number;
   is_20d_high: boolean;
   vol_accel: number;
@@ -61,9 +67,20 @@ export interface MaxRiskScoreResult {
   timestamp: string;
 }
 
+export interface MaxRiskRegimeResult {
+  risk_on: boolean;
+  qqq_close: number;
+  qqq_200sma: number;
+  qqq_distance_pct: number;
+  spy_close: number;
+  spy_200sma: number;
+  description: string;
+}
+
 export interface MaxRiskPortfolioResponse {
   top_picks: MaxRiskScoreResult[];
   full_ranking: MaxRiskScoreResult[];
+  regime: MaxRiskRegimeResult;
   use_turbo: boolean;
   scanned_at: string;
   total_scanned: number;

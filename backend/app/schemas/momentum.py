@@ -168,15 +168,25 @@ class MaxRiskScoreResult(BaseModel):
     rank: int = Field(..., ge=1, description="Rank by score")
     price: float = Field(..., description="Current price")
 
-    # Raw returns
-    return_3m: float = Field(..., description="3-month raw return %")
-    return_6m: float = Field(..., description="6-month raw return %")
-    return_12m: float = Field(..., description="12-month raw return %")
+    # Absolute returns (close-to-close)
+    r1w: float = Field(0.0, description="1-week (5d) return %")
+    r1m: float = Field(0.0, description="1-month (21d) return %")
+    return_3m: float = Field(..., description="3-month (63d) return %")
+    return_6m: float = Field(..., description="6-month (126d) return %")
+    return_12m: float = Field(..., description="12-month (252d) return %")
+
+    # Relative strength vs SPY
+    rs3m: float = Field(0.0, description="R3M - SPY_R3M %")
+    rs6m: float = Field(0.0, description="R6M - SPY_R6M %")
+    rs12m: float = Field(0.0, description="R12M - SPY_R12M %")
+
+    # Volatility expansion
+    vexp: float = Field(0.0, description="ln(stdev10d/stdev60d), clipped [-1,+1]")
 
     # Factors
-    breakout_factor: float = Field(..., description="20-day breakout factor (0-1)")
+    breakout_factor: float = Field(..., description="1 if Close >= 20D High, else 0")
     is_20d_high: bool = Field(False, description="At 20-day high?")
-    vol_accel: float = Field(..., description="Volume acceleration (5D/50D)")
+    vol_accel: float = Field(..., description="ln(AvgVol5/AvgVol50), clipped [-1,+1]")
 
     # Moving averages
     sma_50: float = Field(..., description="50-day SMA")
@@ -184,8 +194,8 @@ class MaxRiskScoreResult(BaseModel):
     price_to_200dma: float = Field(..., description="Price / 200DMA ratio")
 
     # Scores
-    max_risk_score: float = Field(..., description="Raw MaxRiskScore")
-    turbo_score: float = Field(..., description="TurboScore with convexity bias")
+    max_risk_score: float = Field(..., description="11-factor MaxRiskMomentum score")
+    turbo_score: float = Field(..., description="MaxRisk + 0.05*(R1M-R3M)")
 
     # Exit conditions
     below_50dma: bool = Field(False, description="Close below 50DMA")
@@ -195,10 +205,22 @@ class MaxRiskScoreResult(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
+class MaxRiskRegimeResult(BaseModel):
+    """QQQ-based regime filter result."""
+    risk_on: bool = Field(True, description="QQQ_Close > QQQ_200SMA")
+    qqq_close: float = Field(0.0)
+    qqq_200sma: float = Field(0.0)
+    qqq_distance_pct: float = Field(0.0, description="QQQ % above/below 200SMA")
+    spy_close: float = Field(0.0)
+    spy_200sma: float = Field(0.0)
+    description: str = Field("")
+
+
 class MaxRiskPortfolioResponse(BaseModel):
     """Max Risk portfolio with top picks and full scan."""
-    top_picks: List[MaxRiskScoreResult] = Field(default_factory=list, description="Top 5 picks to buy")
+    top_picks: List[MaxRiskScoreResult] = Field(default_factory=list, description="Top picks to buy")
     full_ranking: List[MaxRiskScoreResult] = Field(default_factory=list, description="Full ranked list")
+    regime: MaxRiskRegimeResult = Field(default_factory=MaxRiskRegimeResult)
     use_turbo: bool = Field(False, description="Whether TurboScore was used for ranking")
     scanned_at: datetime = Field(default_factory=datetime.utcnow)
     total_scanned: int = Field(0, description="Total symbols scanned")

@@ -22,6 +22,7 @@ from app.schemas.momentum import (
     DailySnapshotResult,
     MaxRiskScoreResult,
     MaxRiskPortfolioResponse,
+    MaxRiskRegimeResult,
     InstitutionalMomentumResult,
     InstitutionalPortfolioResponse,
     MarketRegimeResult,
@@ -31,7 +32,7 @@ from app.services.sentiment_service import get_sentiment_service
 from app.services.advanced_momentum import get_momentum_algorithm, MomentumFactors
 from app.services.stock_universe import get_quick_scan_universe, get_sector_etfs
 from app.services.backtesting import get_backtesting_engine, BacktestConfig
-from app.services.max_risk_momentum import get_max_risk_engine, MaxRiskFactors
+from app.services.max_risk_momentum import get_max_risk_engine, MaxRiskFactors, RegimeData
 from app.services.institutional_momentum import get_institutional_engine, InstitutionalFactors, MarketRegimeData
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
@@ -618,9 +619,15 @@ def _factors_to_max_risk_result(factors: MaxRiskFactors) -> MaxRiskScoreResult:
         symbol=factors.symbol,
         rank=factors.rank,
         price=factors.price,
+        r1w=factors.r1w,
+        r1m=factors.r1m,
         return_3m=factors.return_3m,
         return_6m=factors.return_6m,
         return_12m=factors.return_12m,
+        rs3m=factors.rs3m,
+        rs6m=factors.rs6m,
+        rs12m=factors.rs12m,
+        vexp=factors.vexp,
         breakout_factor=factors.breakout_factor,
         is_20d_high=factors.is_20d_high,
         vol_accel=factors.vol_accel,
@@ -636,18 +643,32 @@ def _factors_to_max_risk_result(factors: MaxRiskFactors) -> MaxRiskScoreResult:
     )
 
 
+def _regime_data_to_result(regime: RegimeData) -> MaxRiskRegimeResult:
+    """Convert RegimeData dataclass to Pydantic schema."""
+    return MaxRiskRegimeResult(
+        risk_on=regime.risk_on,
+        qqq_close=regime.qqq_close,
+        qqq_200sma=regime.qqq_200sma,
+        qqq_distance_pct=regime.qqq_distance_pct,
+        spy_close=regime.spy_close,
+        spy_200sma=regime.spy_200sma,
+        description=regime.description,
+    )
+
+
 @router.get("/max-risk-scan", response_model=List[MaxRiskScoreResult])
 async def max_risk_scan(
     limit: int = Query(20, ge=1, le=100, description="Number of results"),
     use_turbo: bool = Query(False, description="Rank by TurboScore instead of MaxRiskScore"),
 ):
     """
-    Scan the market using the Max Risk Momentum formula.
+    Scan the market using the Max Risk Momentum formula (v2).
 
-    MaxRiskScore = (0.35·R3) + (0.30·R6) + (0.20·R12) + (0.10·BO) + (0.05·VolAccel)
-    TurboScore  = MaxRiskScore × (Price / 200DMA)
+    MaxRiskMomentum = 0.18*R1W + 0.18*R1M + 0.18*R3M + 0.18*R6M + 0.08*R12M
+                    + 0.10*RS3M + 0.06*RS6M + 0.04*RS12M
+                    + 0.06*VExp + 0.05*BO + 0.03*VolAccel
 
-    Returns ranked list of stocks sorted by score descending.
+    Turbo: + 0.05*(R1M - R3M)
     """
     engine = get_max_risk_engine()
     symbols = get_quick_scan_universe()
@@ -667,22 +688,25 @@ async def max_risk_scan(
 
 @router.get("/max-risk-portfolio", response_model=MaxRiskPortfolioResponse)
 async def max_risk_portfolio(
-    top_n: int = Query(5, ge=1, le=20, description="Number of top picks"),
+    top_n: int = Query(10, ge=1, le=20, description="Number of top picks"),
     use_turbo: bool = Query(False, description="Use TurboScore for ranking"),
 ):
     """
-    Get the Max Risk momentum portfolio — top picks for aggressive momentum.
+    Get the Max Risk momentum portfolio with QQQ regime filter.
 
-    Selection rules:
-    - Scan full universe
-    - Filter: avg daily $ volume > $50M
-    - Rank by MaxRiskScore (or TurboScore)
-    - Return top N picks (equal weight)
-    - Exit: Drop out of top 10, close < 50DMA, or -15% hard stop
+    Regime: RiskOn = QQQ_Close > QQQ_200SMA.
+    If RiskOff, all signals become HOLD (cash mode).
+
+    Selection:
+    - Scan full universe, price > $5, avg daily $ vol > $50M
+    - Rank by 11-factor MaxRiskScore (or Turbo)
+    - Top N equal-weight picks
+    - Exit: close < 50DMA, or -15% hard stop
     """
     engine = get_max_risk_engine()
     symbols = get_quick_scan_universe()
 
+    regime = await engine.assess_regime()
     top_picks = await engine.get_top_picks(symbols, top_n=top_n, use_turbo=use_turbo)
     all_factors = await engine.scan_universe(symbols)
 
@@ -692,9 +716,20 @@ async def max_risk_portfolio(
     for i, f in enumerate(all_factors):
         f.rank = i + 1
 
+    # If risk-off, override all signals to HOLD
+    if not regime.risk_on:
+        for f in top_picks:
+            f.signal = "HOLD"
+        for f in all_factors:
+            if f.below_50dma:
+                f.signal = "SELL"
+            else:
+                f.signal = "HOLD"
+
     return MaxRiskPortfolioResponse(
         top_picks=[_factors_to_max_risk_result(f) for f in top_picks],
         full_ranking=[_factors_to_max_risk_result(f) for f in all_factors[:30]],
+        regime=_regime_data_to_result(regime),
         use_turbo=use_turbo,
         total_scanned=len(all_factors),
     )
