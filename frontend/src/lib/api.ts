@@ -69,6 +69,48 @@ export interface MaxRiskPortfolioResponse {
   total_scanned: number;
 }
 
+// ── Institutional Momentum Types ────────────────────────────────
+
+export interface MarketRegimeResult {
+  regime: "BULL" | "BEAR" | "NEUTRAL";
+  spy_above_200dma: boolean;
+  spy_distance_200dma: number;
+  market_volatility: number;
+  breadth: number;
+  description: string;
+}
+
+export interface InstitutionalMomentumResult {
+  symbol: string;
+  rank: number;
+  quintile: number;
+  price: number;
+  r12_skip1: number;
+  r6_skip1: number;
+  r3_skip1: number;
+  r1: number;
+  volatility: number;
+  risk_adj_return: number;
+  vol_scaled_weight: number;
+  raw_score: number;
+  vol_adjusted_score: number;
+  avg_dollar_volume: number;
+  passes_liquidity: boolean;
+  above_200dma: boolean;
+  distance_to_200dma: number;
+  signal: string;
+  timestamp: string;
+}
+
+export interface InstitutionalPortfolioResponse {
+  portfolio: InstitutionalMomentumResult[];
+  full_ranking: InstitutionalMomentumResult[];
+  market_regime: MarketRegimeResult;
+  breadth: number;
+  vol_scaling_enabled: boolean;
+  total_scanned: number;
+}
+
 class APIClient {
   private baseUrl: string;
 
@@ -159,6 +201,43 @@ class APIClient {
   async getMaxRiskAnalysis(symbol: string): Promise<MaxRiskScoreResult> {
     return this.fetch<MaxRiskScoreResult>(
       `/dashboard/max-risk-analyze/${symbol}`
+    );
+  }
+
+  // ── Institutional Momentum Methods ──────────────────────────
+
+  /**
+   * Get institutional momentum portfolio (holdings + ranking + regime)
+   */
+  async getInstitutionalPortfolio(
+    topN: number = 10,
+    volScaling: boolean = true
+  ): Promise<InstitutionalPortfolioResponse> {
+    return this.fetch<InstitutionalPortfolioResponse>(
+      `/dashboard/institutional-portfolio?top_n=${topN}&vol_scaling=${volScaling}`
+    );
+  }
+
+  /**
+   * Get institutional momentum scan (ranked list)
+   */
+  async getInstitutionalScan(
+    limit: number = 20,
+    volAdjusted: boolean = true
+  ): Promise<InstitutionalMomentumResult[]> {
+    return this.fetch<InstitutionalMomentumResult[]>(
+      `/dashboard/institutional-scan?limit=${limit}&vol_adjusted=${volAdjusted}`
+    );
+  }
+
+  /**
+   * Get institutional momentum analysis for a single symbol
+   */
+  async getInstitutionalAnalysis(
+    symbol: string
+  ): Promise<InstitutionalMomentumResult> {
+    return this.fetch<InstitutionalMomentumResult>(
+      `/dashboard/institutional-analyze/${symbol}`
     );
   }
 }

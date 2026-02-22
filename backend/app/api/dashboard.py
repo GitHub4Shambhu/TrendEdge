@@ -22,6 +22,9 @@ from app.schemas.momentum import (
     DailySnapshotResult,
     MaxRiskScoreResult,
     MaxRiskPortfolioResponse,
+    InstitutionalMomentumResult,
+    InstitutionalPortfolioResponse,
+    MarketRegimeResult,
 )
 from app.services.momentum_service import get_momentum_service
 from app.services.sentiment_service import get_sentiment_service
@@ -29,6 +32,7 @@ from app.services.advanced_momentum import get_momentum_algorithm, MomentumFacto
 from app.services.stock_universe import get_quick_scan_universe, get_sector_etfs
 from app.services.backtesting import get_backtesting_engine, BacktestConfig
 from app.services.max_risk_momentum import get_max_risk_engine, MaxRiskFactors
+from app.services.institutional_momentum import get_institutional_engine, InstitutionalFactors, MarketRegimeData
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -709,3 +713,129 @@ async def max_risk_analyze_symbol(symbol: str):
 
     factors.rank = 1
     return _factors_to_max_risk_result(factors)
+
+
+# ============================================================================
+# Institutional Momentum Endpoints
+# ============================================================================
+
+def _factors_to_institutional_result(factors: InstitutionalFactors) -> InstitutionalMomentumResult:
+    """Convert InstitutionalFactors dataclass to Pydantic schema."""
+    return InstitutionalMomentumResult(
+        symbol=factors.symbol,
+        rank=factors.rank,
+        quintile=factors.quintile,
+        price=factors.price,
+        r12_skip1=round(factors.r12_skip1, 2),
+        r6_skip1=round(factors.r6_skip1, 2),
+        r3_skip1=round(factors.r3_skip1, 2),
+        r1=round(factors.r1, 2),
+        volatility=round(factors.volatility, 2),
+        risk_adj_return=round(factors.risk_adj_return, 2),
+        vol_scaled_weight=round(factors.vol_scaled_weight, 4),
+        raw_score=round(factors.raw_score, 4),
+        vol_adjusted_score=round(factors.vol_adjusted_score, 4),
+        avg_dollar_volume=round(factors.avg_dollar_volume, 0),
+        passes_liquidity=factors.passes_liquidity,
+        above_200dma=factors.above_200dma,
+        distance_to_200dma=round(factors.distance_to_200dma, 2),
+        signal=factors.signal,
+        timestamp=factors.timestamp,
+    )
+
+
+def _regime_to_result(regime: MarketRegimeData) -> MarketRegimeResult:
+    """Convert MarketRegimeData dataclass to Pydantic schema."""
+    return MarketRegimeResult(
+        regime=regime.regime.value,
+        spy_above_200dma=regime.spy_above_200dma,
+        spy_distance_200dma=round(regime.spy_distance_200dma, 2),
+        market_volatility=round(regime.market_volatility, 2),
+        breadth=round(regime.breadth, 2),
+        description=regime.description,
+    )
+
+
+@router.get("/institutional-scan", response_model=List[InstitutionalMomentumResult])
+async def institutional_scan(
+    limit: int = Query(20, ge=1, le=100, description="Number of results"),
+    vol_adjusted: bool = Query(True, description="Rank by vol-adjusted score"),
+):
+    """
+    Scan the market using institutional momentum scoring.
+
+    Score = 0.4·R(12-1) + 0.3·R(6-1) + 0.2·R(3-1) + 0.1·(R/σ × 10)
+
+    Uses skip-month returns to avoid short-term reversal,
+    with optional volatility scaling for equal-risk contribution.
+    """
+    engine = get_institutional_engine()
+    symbols = get_quick_scan_universe()
+
+    all_factors = await engine.scan_universe(symbols)
+
+    if vol_adjusted:
+        all_factors.sort(key=lambda f: f.vol_adjusted_score, reverse=True)
+    else:
+        all_factors.sort(key=lambda f: f.raw_score, reverse=True)
+
+    for i, f in enumerate(all_factors):
+        f.rank = i + 1
+
+    return [_factors_to_institutional_result(f) for f in all_factors[:limit]]
+
+
+@router.get("/institutional-portfolio", response_model=InstitutionalPortfolioResponse)
+async def institutional_portfolio(
+    top_n: int = Query(10, ge=1, le=30, description="Number of portfolio holdings"),
+    vol_scaling: bool = Query(True, description="Use inverse-volatility weighting"),
+):
+    """
+    Build an institutional momentum portfolio.
+
+    Selection:
+    - Scan full universe with skip-month momentum
+    - Filter: avg daily $ volume ≥ $50M, above 200DMA
+    - Rank by vol-adjusted score
+    - Weight by inverse volatility (1/σ)
+    - Market regime overlay: reduce exposure in BEAR regime
+
+    Returns top N holdings plus full ranking and market regime info.
+    """
+    engine = get_institutional_engine()
+    symbols = get_quick_scan_universe()
+
+    portfolio, regime = await engine.get_portfolio(
+        symbols, top_n=top_n, vol_scaling=vol_scaling
+    )
+
+    all_factors = await engine.scan_universe(symbols)
+    all_factors.sort(key=lambda f: f.vol_adjusted_score, reverse=True)
+    for i, f in enumerate(all_factors):
+        f.rank = i + 1
+
+    breadth = sum(1 for f in all_factors if f.above_200dma) / max(len(all_factors), 1) * 100
+
+    return InstitutionalPortfolioResponse(
+        portfolio=[_factors_to_institutional_result(f) for f in portfolio],
+        full_ranking=[_factors_to_institutional_result(f) for f in all_factors[:30]],
+        market_regime=_regime_to_result(regime),
+        breadth=round(breadth, 1),
+        vol_scaling_enabled=vol_scaling,
+        total_scanned=len(all_factors),
+    )
+
+
+@router.get("/institutional-analyze/{symbol}", response_model=InstitutionalMomentumResult)
+async def institutional_analyze_symbol(symbol: str):
+    """
+    Get institutional momentum analysis for a single symbol.
+    """
+    engine = get_institutional_engine()
+    factors = await engine.analyze_single(symbol.upper())
+
+    if factors is None:
+        raise HTTPException(status_code=404, detail=f"Could not analyze symbol: {symbol}")
+
+    factors.rank = 1
+    return _factors_to_institutional_result(factors)

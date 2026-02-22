@@ -13,6 +13,7 @@ import { SentimentGauge } from "@/components/SentimentGauge";
 import { StockComparison } from "@/components/StockComparison";
 import Backtesting from "@/components/Backtesting";
 import MaxRiskMomentum from "@/components/MaxRiskMomentum";
+import InstitutionalMomentum from "@/components/InstitutionalMomentum";
 import { formatRelativeTime } from "@/lib/utils";
 
 // Mock data for development when backend is not running
@@ -294,6 +295,15 @@ export function Dashboard() {
           Max Risk Momentum Score
         </h2>
         <MaxRiskMomentum />
+      </section>
+
+      {/* Institutional Momentum Score */}
+      <section>
+        <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-indigo-500" />
+          Institutional Momentum Score
+        </h2>
+        <InstitutionalMomentum />
       </section>
 
       {/* Top ETFs */}

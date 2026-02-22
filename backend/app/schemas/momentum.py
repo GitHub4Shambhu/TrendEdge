@@ -202,3 +202,60 @@ class MaxRiskPortfolioResponse(BaseModel):
     use_turbo: bool = Field(False, description="Whether TurboScore was used for ranking")
     scanned_at: datetime = Field(default_factory=datetime.utcnow)
     total_scanned: int = Field(0, description="Total symbols scanned")
+
+
+# ============================================================================
+# Institutional Momentum Schemas
+# ============================================================================
+
+class MarketRegimeResult(BaseModel):
+    """Market regime assessment."""
+    regime: str = Field(..., description="BULL / BEAR / NEUTRAL")
+    spy_above_200dma: bool = Field(True)
+    spy_distance_200dma: float = Field(0.0, description="SPY % distance to 200DMA")
+    market_volatility: float = Field(0.0, description="Realized market vol %")
+    breadth: float = Field(0.0, description="% of universe above 200DMA")
+    description: str = Field("")
+
+
+class InstitutionalMomentumResult(BaseModel):
+    """Institutional momentum score for a single symbol."""
+    symbol: str = Field(..., description="Ticker symbol")
+    rank: int = Field(..., ge=1)
+    quintile: int = Field(3, ge=1, le=5, description="1=top 20%, 5=bottom 20%")
+    price: float = Field(...)
+
+    # Skip-month returns
+    r12_skip1: float = Field(..., description="12M return skipping last month %")
+    r6_skip1: float = Field(..., description="6M return skipping last month %")
+    r3_skip1: float = Field(..., description="3M return skipping last month %")
+    r1: float = Field(..., description="Last 1-month return (skipped) %")
+
+    # Volatility
+    volatility: float = Field(..., description="Annualized vol %")
+    risk_adj_return: float = Field(..., description="Return / Vol ratio")
+    vol_scaled_weight: float = Field(..., description="Inverse-vol portfolio weight")
+
+    # Scores
+    raw_score: float = Field(..., description="Raw institutional momentum score")
+    vol_adjusted_score: float = Field(..., description="Volatility-adjusted score")
+
+    # Filters
+    avg_dollar_volume: float = Field(0.0)
+    passes_liquidity: bool = Field(False)
+    above_200dma: bool = Field(False)
+    distance_to_200dma: float = Field(0.0, description="% above/below 200DMA")
+
+    signal: str = Field(..., description="BUY / SELL / HOLD")
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+
+class InstitutionalPortfolioResponse(BaseModel):
+    """Institutional momentum portfolio response."""
+    portfolio: List[InstitutionalMomentumResult] = Field(default_factory=list)
+    full_ranking: List[InstitutionalMomentumResult] = Field(default_factory=list)
+    market_regime: MarketRegimeResult = Field(...)
+    breadth: float = Field(0.0, description="% of universe above 200DMA")
+    vol_scaling_enabled: bool = Field(True)
+    total_scanned: int = Field(0)
+    scanned_at: datetime = Field(default_factory=datetime.utcnow)
