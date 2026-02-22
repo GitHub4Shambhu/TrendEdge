@@ -142,17 +142,17 @@ function MetricCard({
   icon?: React.ReactNode;
 }) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-      <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-sm mb-1">
+    <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+      <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
         {icon}
         {label}
       </div>
       <div className={`text-2xl font-bold ${
         isPositive === undefined 
-          ? "text-gray-900 dark:text-white"
+          ? "text-white"
           : isPositive 
-            ? "text-green-600 dark:text-green-400" 
-            : "text-red-600 dark:text-red-400"
+            ? "text-green-400" 
+            : "text-red-400"
       }`}>
         {value}
       </div>
@@ -197,16 +197,16 @@ function TradeList({ trades }: { trades: TradeResult[] }) {
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-gray-200 dark:border-gray-700">
+          <tr className="border-b border-gray-700">
             <th 
-              className="text-left py-3 px-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+              className="text-left py-3 px-2 cursor-pointer hover:bg-gray-700/50"
               onClick={() => handleSort("symbol")}
             >
               Symbol {sortBy === "symbol" && (sortAsc ? "↑" : "↓")}
             </th>
             <th className="text-left py-3 px-2">Action</th>
             <th 
-              className="text-left py-3 px-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+              className="text-left py-3 px-2 cursor-pointer hover:bg-gray-700/50"
               onClick={() => handleSort("date")}
             >
               Entry {sortBy === "date" && (sortAsc ? "↑" : "↓")}
@@ -216,7 +216,7 @@ function TradeList({ trades }: { trades: TradeResult[] }) {
             <th className="text-right py-3 px-2">Exit $</th>
             <th className="text-right py-3 px-2">Days</th>
             <th 
-              className="text-right py-3 px-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+              className="text-right py-3 px-2 cursor-pointer hover:bg-gray-700/50"
               onClick={() => handleSort("pnl")}
             >
               P&L {sortBy === "pnl" && (sortAsc ? "↑" : "↓")}
@@ -228,33 +228,33 @@ function TradeList({ trades }: { trades: TradeResult[] }) {
           {sortedTrades.map((trade, idx) => (
             <tr 
               key={idx} 
-              className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+              className="border-b border-gray-800 hover:bg-gray-800/50"
             >
               <td className="py-2 px-2 font-medium">{trade.symbol}</td>
               <td className="py-2 px-2">
                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                   trade.action === "BUY" 
-                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                    : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                    ? "bg-green-500/20 text-green-400"
+                    : "bg-red-500/20 text-red-400"
                 }`}>
                   {trade.action}
                 </span>
               </td>
-              <td className="py-2 px-2 text-gray-600 dark:text-gray-400">
+              <td className="py-2 px-2 text-gray-400">
                 {new Date(trade.entry_date).toLocaleDateString()}
               </td>
               <td className="py-2 px-2 text-right">${trade.entry_price.toFixed(2)}</td>
-              <td className="py-2 px-2 text-gray-600 dark:text-gray-400">
+              <td className="py-2 px-2 text-gray-400">
                 {trade.exit_date ? new Date(trade.exit_date).toLocaleDateString() : "-"}
               </td>
               <td className="py-2 px-2 text-right">
                 {trade.exit_price ? `$${trade.exit_price.toFixed(2)}` : "-"}
               </td>
-              <td className="py-2 px-2 text-right text-gray-600 dark:text-gray-400">
+              <td className="py-2 px-2 text-right text-gray-400">
                 {trade.holding_days}
               </td>
               <td className={`py-2 px-2 text-right font-medium ${
-                trade.pnl >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                trade.pnl >= 0 ? "text-green-400" : "text-red-400"
               }`}>
                 {formatPercent(trade.pnl_percent)}
               </td>
@@ -379,26 +379,26 @@ export default function Backtesting() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <h2 className="text-2xl font-bold text-white">
             Momentum Strategy Backtester
           </h2>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-gray-400 mt-1">
             Test the AI momentum algorithm against historical data
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500 px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded">
+          <span className="text-xs text-gray-500 px-2 py-1 bg-gray-800 rounded">
             Simulated Results
           </span>
         </div>
       </div>
 
       {/* Configuration Panel */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-gray-800/50 rounded-2xl border border-gray-700 p-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Column - Main Settings */}
           <div className="space-y-4">
-            <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+            <h3 className="font-semibold text-white flex items-center gap-2">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -408,14 +408,14 @@ export default function Backtesting() {
 
             {/* Symbols */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-300 mb-1">
                 Symbols (comma-separated)
               </label>
               <input
                 type="text"
                 value={symbolInput}
                 onChange={(e) => setSymbolInput(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="AAPL, MSFT, GOOGL..."
               />
             </div>
@@ -423,32 +423,32 @@ export default function Backtesting() {
             {/* Date Range */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Start Date
                 </label>
                 <input
                   type="date"
                   value={config.start_date}
                   onChange={(e) => setConfig(prev => ({ ...prev, start_date: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   End Date
                 </label>
                 <input
                   type="date"
                   value={config.end_date}
                   onChange={(e) => setConfig(prev => ({ ...prev, end_date: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
 
             {/* Initial Capital */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-300 mb-1">
                 Initial Capital: {formatCurrency(config.initial_capital)}
               </label>
               <input
@@ -469,7 +469,7 @@ export default function Backtesting() {
 
           {/* Right Column - Presets & Advanced */}
           <div className="space-y-4">
-            <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+            <h3 className="font-semibold text-white flex items-center gap-2">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
@@ -481,9 +481,9 @@ export default function Backtesting() {
                 <button
                   key={preset.name}
                   onClick={() => applyPreset(preset)}
-                  className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
+                  className="p-3 border border-gray-700 rounded-lg hover:bg-gray-700 transition-colors text-left"
                 >
-                  <div className="font-medium text-sm text-gray-900 dark:text-white">
+                  <div className="font-medium text-sm text-white">
                     {preset.name}
                   </div>
                   <div className="text-xs text-gray-500 mt-1">{preset.description}</div>
@@ -494,7 +494,7 @@ export default function Backtesting() {
             {/* Advanced Settings Toggle */}
             <button
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+              className="text-sm text-blue-400 hover:underline flex items-center gap-1"
             >
               {showAdvanced ? "Hide" : "Show"} Advanced Settings
               <svg 
@@ -510,7 +510,7 @@ export default function Backtesting() {
             {showAdvanced && (
               <div className="grid grid-cols-2 gap-4 pt-2">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  <label className="block text-xs font-medium text-gray-400 mb-1">
                     Position Size: {(config.position_size_pct * 100).toFixed(0)}%
                   </label>
                   <input
@@ -524,7 +524,7 @@ export default function Backtesting() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  <label className="block text-xs font-medium text-gray-400 mb-1">
                     Max Positions: {config.max_positions}
                   </label>
                   <input
@@ -538,7 +538,7 @@ export default function Backtesting() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  <label className="block text-xs font-medium text-gray-400 mb-1">
                     Stop Loss: {(config.stop_loss_pct * 100).toFixed(0)}%
                   </label>
                   <input
@@ -552,7 +552,7 @@ export default function Backtesting() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  <label className="block text-xs font-medium text-gray-400 mb-1">
                     Take Profit: {(config.take_profit_pct * 100).toFixed(0)}%
                   </label>
                   <input
@@ -566,7 +566,7 @@ export default function Backtesting() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  <label className="block text-xs font-medium text-gray-400 mb-1">
                     Buy Threshold: {(config.momentum_buy_threshold * 100).toFixed(0)}%
                   </label>
                   <input
@@ -580,7 +580,7 @@ export default function Backtesting() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  <label className="block text-xs font-medium text-gray-400 mb-1">
                     Rebalance: Every {config.rebalance_frequency} days
                   </label>
                   <input
@@ -636,11 +636,11 @@ export default function Backtesting() {
 
       {/* Error State */}
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 flex items-center gap-3">
-          <svg className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="bg-red-900/20 border border-red-800 rounded-xl p-4 flex items-center gap-3">
+          <svg className="w-5 h-5 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <span className="text-red-700 dark:text-red-300">{error}</span>
+          <span className="text-red-300">{error}</span>
         </div>
       )}
 
@@ -716,8 +716,8 @@ export default function Backtesting() {
 
           {/* Stats Summary */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-              <h4 className="font-medium text-gray-900 dark:text-white mb-3">Trade Statistics</h4>
+            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+              <h4 className="font-medium text-white mb-3">Trade Statistics</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Total Trades</span>
@@ -725,11 +725,11 @@ export default function Backtesting() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Winning Trades</span>
-                  <span className="font-medium text-green-600">{results.winning_trades}</span>
+                  <span className="font-medium text-green-400">{results.winning_trades}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Losing Trades</span>
-                  <span className="font-medium text-red-600">{results.losing_trades}</span>
+                  <span className="font-medium text-red-400">{results.losing_trades}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Sortino Ratio</span>
@@ -738,8 +738,8 @@ export default function Backtesting() {
               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-              <h4 className="font-medium text-gray-900 dark:text-white mb-3">Time Period</h4>
+            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+              <h4 className="font-medium text-white mb-3">Time Period</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Start Date</span>
@@ -756,21 +756,21 @@ export default function Backtesting() {
               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-              <h4 className="font-medium text-gray-900 dark:text-white mb-3">Final Value</h4>
-              <div className="text-3xl font-bold text-gray-900 dark:text-white">
+            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+              <h4 className="font-medium text-white mb-3">Final Value</h4>
+              <div className="text-3xl font-bold text-white">
                 {formatCurrency(results.equity_curve[results.equity_curve.length - 1] || config.initial_capital)}
               </div>
-              <div className={`text-sm mt-1 ${results.total_return >= 0 ? "text-green-600" : "text-red-600"}`}>
+              <div className={`text-sm mt-1 ${results.total_return >= 0 ? "text-green-400" : "text-red-400"}`}>
                 {results.total_return >= 0 ? "+" : ""}{formatCurrency(results.equity_curve[results.equity_curve.length - 1] - config.initial_capital)}
               </div>
             </div>
           </div>
 
           {/* Trade History */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+          <div className="bg-gray-800/50 rounded-2xl border border-gray-700 overflow-hidden">
+            <div className="p-4 border-b border-gray-700 flex items-center justify-between">
+              <h3 className="font-semibold text-white flex items-center gap-2">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
