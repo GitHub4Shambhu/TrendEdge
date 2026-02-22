@@ -14,6 +14,7 @@ import { StockComparison } from "@/components/StockComparison";
 import Backtesting from "@/components/Backtesting";
 import MaxRiskMomentum from "@/components/MaxRiskMomentum";
 import InstitutionalMomentum from "@/components/InstitutionalMomentum";
+import MarketSentiment from "@/components/MarketSentiment";
 import { formatRelativeTime } from "@/lib/utils";
 
 // Mock data for development when backend is not running
@@ -263,8 +264,14 @@ export function Dashboard() {
         </button>
       </div>
 
-      {/* Market Sentiment */}
-      <SentimentGauge sentiment={data.market_sentiment} />
+      {/* Market Sentiment — 9-metric rolling window model */}
+      <section>
+        <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-blue-500" />
+          Market Sentiment Model
+        </h2>
+        <MarketSentiment />
+      </section>
 
       {/* Top Stocks */}
       <section>

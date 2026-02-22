@@ -281,3 +281,30 @@ class InstitutionalPortfolioResponse(BaseModel):
     vol_scaling_enabled: bool = Field(True)
     total_scanned: int = Field(0)
     scanned_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ============================================================================
+# Market Sentiment Schemas
+# ============================================================================
+
+class SentimentMetricDetail(BaseModel):
+    """Single metric with Z-score and weight."""
+    name: str = Field(..., description="Metric key")
+    raw_value: float = Field(..., description="Current raw metric value")
+    z_score: float = Field(..., description="Z-score within W window")
+    weight: float = Field(..., description="Aggregation weight")
+    weighted_z: float = Field(..., description="weight × z_score")
+    description: str = Field("", description="Human-readable label")
+    series: List[float] = Field(default_factory=list, description="Full W-day Z-score series")
+
+
+class MarketSentimentResponse(BaseModel):
+    """Complete market sentiment model output."""
+    final_score: float = Field(..., ge=0.0, le=1.0, description="0-1 sentiment probability")
+    regime: str = Field(..., description="Fear / Defensive / Neutral / Risk-On / Euphoria")
+    trend_direction: str = Field(..., description="Rising / Falling / Flat")
+    trend_slope: float = Field(..., description="Per-day slope of composite within W")
+    composite_raw: float = Field(..., description="Raw weighted-Z sum before logistic")
+    metrics: List[SentimentMetricDetail] = Field(default_factory=list)
+    window_size: int = Field(20, description="Rolling window W (trading days)")
+    timestamp: datetime = Field(default_factory=datetime.utcnow)

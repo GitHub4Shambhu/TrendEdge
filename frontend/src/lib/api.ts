@@ -128,6 +128,29 @@ export interface InstitutionalPortfolioResponse {
   total_scanned: number;
 }
 
+// ── Market Sentiment Types ──────────────────────────────────────
+
+export interface SentimentMetricDetail {
+  name: string;
+  raw_value: number;
+  z_score: number;
+  weight: number;
+  weighted_z: number;
+  description: string;
+  series: number[];
+}
+
+export interface MarketSentimentResponse {
+  final_score: number;
+  regime: string;
+  trend_direction: string;
+  trend_slope: number;
+  composite_raw: number;
+  metrics: SentimentMetricDetail[];
+  window_size: number;
+  timestamp: string;
+}
+
 class APIClient {
   private baseUrl: string;
 
@@ -255,6 +278,19 @@ class APIClient {
   ): Promise<InstitutionalMomentumResult> {
     return this.fetch<InstitutionalMomentumResult>(
       `/dashboard/institutional-analyze/${symbol}`
+    );
+  }
+
+  // ── Market Sentiment Methods ──────────────────────────────
+
+  /**
+   * Get market sentiment model output (single W-window)
+   */
+  async getMarketSentiment(
+    window: number = 20
+  ): Promise<MarketSentimentResponse> {
+    return this.fetch<MarketSentimentResponse>(
+      `/dashboard/market-sentiment?window=${window}`
     );
   }
 }

@@ -26,6 +26,8 @@ from app.schemas.momentum import (
     InstitutionalMomentumResult,
     InstitutionalPortfolioResponse,
     MarketRegimeResult,
+    SentimentMetricDetail,
+    MarketSentimentResponse,
 )
 from app.services.momentum_service import get_momentum_service
 from app.services.sentiment_service import get_sentiment_service
@@ -34,6 +36,7 @@ from app.services.stock_universe import get_quick_scan_universe, get_sector_etfs
 from app.services.backtesting import get_backtesting_engine, BacktestConfig
 from app.services.max_risk_momentum import get_max_risk_engine, MaxRiskFactors, RegimeData
 from app.services.institutional_momentum import get_institutional_engine, InstitutionalFactors, MarketRegimeData
+from app.services.market_sentiment import get_sentiment_engine, SentimentResult, SentimentMetric
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -874,3 +877,60 @@ async def institutional_analyze_symbol(symbol: str):
 
     factors.rank = 1
     return _factors_to_institutional_result(factors)
+
+
+# ============================================================================
+# Market Sentiment Endpoints
+# ============================================================================
+
+def _sentiment_metric_to_detail(m: SentimentMetric) -> SentimentMetricDetail:
+    """Convert engine SentimentMetric to schema SentimentMetricDetail."""
+    return SentimentMetricDetail(
+        name=m.name,
+        raw_value=round(m.raw_value, 4),
+        z_score=round(m.z_score, 4),
+        weight=round(m.weight, 4),
+        weighted_z=round(m.weighted_z, 4),
+        description=m.description,
+        series=[round(v, 4) for v in m.series],
+    )
+
+
+def _sentiment_result_to_response(r: SentimentResult) -> MarketSentimentResponse:
+    """Convert engine SentimentResult to schema MarketSentimentResponse."""
+    return MarketSentimentResponse(
+        final_score=round(r.final_score, 4),
+        regime=r.regime,
+        trend_direction=r.trend_direction,
+        trend_slope=round(r.trend_slope, 6),
+        composite_raw=round(r.composite_raw, 4),
+        metrics=[_sentiment_metric_to_detail(m) for m in r.metrics],
+        window_size=r.window_size,
+        timestamp=r.timestamp,
+    )
+
+
+@router.get("/market-sentiment", response_model=MarketSentimentResponse)
+async def market_sentiment(
+    window: int = Query(20, ge=5, le=60, description="Rolling window W in trading days"),
+):
+    """
+    Market Sentiment model — single rolling W-day window.
+
+    Computes 9 metrics strictly within one W-day window:
+    1. Implied vs Realized Volatility Spread
+    2. 25-delta Put-Call Skew
+    3. Put/Call Volume Ratio
+    4. Net Option Delta Flow / Avg Volume
+    5. % Stocks above W-period Moving Average
+    6. Advance-Decline Ratio
+    7. Price Acceleration (W/2 vs W)
+    8. Volume-Weighted Momentum
+    9. ATR Compression Ratio
+
+    Each metric Z-scored within W → weighted aggregation → logistic → 0-1 score.
+    Outputs: FinalScore, Regime, Trend direction.
+    """
+    engine = get_sentiment_engine(window=window)
+    result = await engine.compute()
+    return _sentiment_result_to_response(result)
