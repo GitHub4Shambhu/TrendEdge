@@ -102,6 +102,7 @@ class AdvancedMomentumAlgorithm:
         self.executor = ThreadPoolExecutor(max_workers=10)
         self.scaler = StandardScaler()
         self._model = None  # Lazy load ML model
+        self._mock_symbols: set = set()  # Track symbols that used mock data
         
         # Weights for composite score
         self.weights = {
@@ -426,12 +427,20 @@ class AdvancedMomentumAlgorithm:
                 hist = ticker.history(period="3mo")
             if hist.empty or len(hist) < 20:
                 # Generate mock data for development/testing
+                self._mock_symbols.add(symbol)
                 return self._generate_mock_data(symbol)
+            self._mock_symbols.discard(symbol)
             return hist
         except Exception as e:
             print(f"Error fetching {symbol}: {e}")
             # Return mock data as fallback
+            self._mock_symbols.add(symbol)
             return self._generate_mock_data(symbol)
+
+    @property
+    def data_source(self) -> str:
+        """Return 'live' if no mock data was used, else 'stale'."""
+        return "stale" if self._mock_symbols else "live"
     
     def _generate_mock_data(self, symbol: str) -> pd.DataFrame:
         """Generate realistic mock data for development when API fails."""

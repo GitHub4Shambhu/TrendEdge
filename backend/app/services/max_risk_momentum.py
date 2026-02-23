@@ -115,6 +115,7 @@ class MaxRiskMomentumEngine:
         self.CACHE_TTL = timedelta(minutes=15)
         self._spy_data: Optional[pd.DataFrame] = None
         self._qqq_data: Optional[pd.DataFrame] = None
+        self._mock_symbols: set = set()  # Track symbols that used mock data
 
     # --- Data Fetching ---
 
@@ -129,11 +130,20 @@ class MaxRiskMomentumEngine:
             ticker = yf.Ticker(symbol)
             hist = ticker.history(period="14mo")
             if hist.empty or len(hist) < 50:
+                self._mock_symbols.add(symbol)
                 hist = self._generate_mock_data(symbol)
+            else:
+                self._mock_symbols.discard(symbol)
             self._cache[symbol] = (hist, datetime.utcnow())
             return hist
         except Exception:
+            self._mock_symbols.add(symbol)
             return self._generate_mock_data(symbol)
+
+    @property
+    def data_source(self) -> str:
+        """Return 'live' if no mock data was used, else 'stale'."""
+        return "stale" if self._mock_symbols else "live"
 
     def _ensure_reference_data(self):
         """Pre-fetch SPY and QQQ data for regime + relative strength."""

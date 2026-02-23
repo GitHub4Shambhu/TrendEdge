@@ -36,6 +36,7 @@ export interface DashboardData {
   top_options: TopOpportunity[];
   market_sentiment: number;
   last_updated: string;
+  data_source?: string;
 }
 
 // ── Max Risk Momentum Types ─────────────────────────────────────
@@ -84,6 +85,7 @@ export interface MaxRiskPortfolioResponse {
   use_turbo: boolean;
   scanned_at: string;
   total_scanned: number;
+  data_source?: string;
 }
 
 // ── Institutional Momentum Types ────────────────────────────────
@@ -126,6 +128,7 @@ export interface InstitutionalPortfolioResponse {
   breadth: number;
   vol_scaling_enabled: boolean;
   total_scanned: number;
+  data_source?: string;
 }
 
 // ── Market Sentiment Types ──────────────────────────────────────
@@ -149,6 +152,7 @@ export interface MarketSentimentResponse {
   metrics: SentimentMetricDetail[];
   window_size: number;
   timestamp: string;
+  data_source?: string;
 }
 
 class APIClient {

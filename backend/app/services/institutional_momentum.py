@@ -109,6 +109,7 @@ class InstitutionalMomentumEngine:
         self.executor = ThreadPoolExecutor(max_workers=8)
         self._cache: Dict[str, Tuple[pd.DataFrame, datetime]] = {}
         self.CACHE_TTL = timedelta(minutes=15)
+        self._mock_symbols: set = set()  # Track symbols that used mock data
 
     # ── Data Fetching ────────────────────────────────────────────
 
@@ -124,12 +125,21 @@ class InstitutionalMomentumEngine:
             ticker = yf.Ticker(symbol)
             hist = ticker.history(period="14mo")
             if hist.empty or len(hist) < 60:
+                self._mock_symbols.add(symbol)
                 hist = self._generate_mock_data(symbol)
+            else:
+                self._mock_symbols.discard(symbol)
             self._cache[symbol] = (hist, datetime.utcnow())
             return hist
         except Exception as e:
             print(f"[Institutional] Error fetching {symbol}: {e}")
+            self._mock_symbols.add(symbol)
             return self._generate_mock_data(symbol)
+
+    @property
+    def data_source(self) -> str:
+        """Return 'live' if no mock data was used, else 'stale'."""
+        return "stale" if self._mock_symbols else "live"
 
     def _generate_mock_data(self, symbol: str) -> pd.DataFrame:
         """Generate realistic mock data (Feb 2026 prices)."""

@@ -15,6 +15,7 @@ import Backtesting from "@/components/Backtesting";
 import MaxRiskMomentum from "@/components/MaxRiskMomentum";
 import InstitutionalMomentum from "@/components/InstitutionalMomentum";
 import MarketSentiment from "@/components/MarketSentiment";
+import DataSourceBadge from "@/components/DataSourceBadge";
 import { formatRelativeTime } from "@/lib/utils";
 
 // Mock data for development when backend is not running
@@ -231,11 +232,12 @@ export function Dashboard() {
               </div>
             </div>
           </div>
-          <p className="text-gray-400 mt-2">
+          <p className="text-gray-400 mt-2 flex items-center gap-2">
             Last updated: {formatRelativeTime(data.last_updated)}
             {useMock && (
               <span className="ml-2 text-yellow-500 text-sm">(Demo Mode)</span>
             )}
+            <DataSourceBadge dataSource={data.data_source} />
           </p>
         </div>
         <button

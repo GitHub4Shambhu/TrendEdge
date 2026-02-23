@@ -56,6 +56,8 @@ class SentimentResult:
     metrics: List[SentimentMetric] = field(default_factory=list)
     window_size: int = 20
     timestamp: datetime = field(default_factory=datetime.utcnow)
+    data_source: str = "live"       # "live" or "stale"
+    data_source: str = "live"       # "live" or "stale"
 
 
 # ── Helpers ──────────────────────────────────────────────────────
@@ -531,6 +533,7 @@ class MarketSentimentEngine:
             composite_raw=round(composite, 4),
             metrics=metrics,
             window_size=self.W,
+            data_source="stale",
         )
 
 

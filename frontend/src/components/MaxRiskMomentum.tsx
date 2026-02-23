@@ -18,6 +18,7 @@ import {
   MaxRiskRegimeResult,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import DataSourceBadge from "./DataSourceBadge";
 
 // ── Mock regime ─────────────────────────────────────────────────
 const MOCK_REGIME: MaxRiskRegimeResult = {
@@ -276,6 +277,7 @@ export default function MaxRiskMomentum() {
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 Max Risk Momentum
                 {useMock && <span className="text-xs text-yellow-500 font-normal">(Demo)</span>}
+                <DataSourceBadge dataSource={data.data_source} />
               </h2>
               <p className="text-xs text-gray-500">
                 11-factor scoring · QQQ regime filter · {data.total_scanned} scanned

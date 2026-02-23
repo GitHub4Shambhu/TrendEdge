@@ -271,11 +271,17 @@ async def get_dashboard(use_advanced: bool = Query(True, description="Use advanc
     # Market sentiment
     market_sentiment = await sentiment_service.get_market_sentiment()
 
+    # Determine data_source
+    ds = "live"
+    if use_advanced and hasattr(algorithm, 'data_source') and algorithm.data_source == "stale":
+        ds = "stale"
+
     return DashboardResponse(
         top_stocks=top_stocks,
         top_etfs=top_etfs,
         top_options=[],  # Options require separate data source
         market_sentiment=market_sentiment,
+        data_source=ds,
     )
 
 
@@ -735,6 +741,7 @@ async def max_risk_portfolio(
         regime=_regime_data_to_result(regime),
         use_turbo=use_turbo,
         total_scanned=len(all_factors),
+        data_source=engine.data_source,
     )
 
 
@@ -843,8 +850,8 @@ async def institutional_portfolio(
     engine = get_institutional_engine()
     symbols = get_quick_scan_universe()
 
-    portfolio, regime = await engine.get_portfolio(
-        symbols, top_n=top_n, vol_scaling=vol_scaling
+    portfolio, regime, _ = await engine.get_portfolio(
+        symbols, top_n=top_n, use_vol_scaling=vol_scaling
     )
 
     all_factors = await engine.scan_universe(symbols)
@@ -861,6 +868,7 @@ async def institutional_portfolio(
         breadth=round(breadth, 1),
         vol_scaling_enabled=vol_scaling,
         total_scanned=len(all_factors),
+        data_source=engine.data_source,
     )
 
 
@@ -907,6 +915,7 @@ def _sentiment_result_to_response(r: SentimentResult) -> MarketSentimentResponse
         metrics=[_sentiment_metric_to_detail(m) for m in r.metrics],
         window_size=r.window_size,
         timestamp=r.timestamp,
+        data_source=r.data_source,
     )
 
 

@@ -58,6 +58,7 @@ class DashboardResponse(BaseModel):
     top_options: List[TopOpportunity] = Field(default_factory=list)
     market_sentiment: float = Field(..., description="Overall market sentiment")
     last_updated: datetime = Field(default_factory=datetime.utcnow)
+    data_source: str = Field("live", description="'live' if all data from yfinance, 'stale' if any mock fallback used")
 
 
 class SymbolSearchRequest(BaseModel):
@@ -224,6 +225,7 @@ class MaxRiskPortfolioResponse(BaseModel):
     use_turbo: bool = Field(False, description="Whether TurboScore was used for ranking")
     scanned_at: datetime = Field(default_factory=datetime.utcnow)
     total_scanned: int = Field(0, description="Total symbols scanned")
+    data_source: str = Field("live", description="'live' if all data from yfinance, 'stale' if any mock fallback used")
 
 
 # ============================================================================
@@ -281,6 +283,7 @@ class InstitutionalPortfolioResponse(BaseModel):
     vol_scaling_enabled: bool = Field(True)
     total_scanned: int = Field(0)
     scanned_at: datetime = Field(default_factory=datetime.utcnow)
+    data_source: str = Field("live", description="'live' if all data from yfinance, 'stale' if any mock fallback used")
 
 
 # ============================================================================
@@ -308,3 +311,4 @@ class MarketSentimentResponse(BaseModel):
     metrics: List[SentimentMetricDetail] = Field(default_factory=list)
     window_size: int = Field(20, description="Rolling window W (trading days)")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+    data_source: str = Field("live", description="'live' if computed from yfinance, 'stale' if fallback used")

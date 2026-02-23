@@ -18,6 +18,7 @@ import {
   MarketRegimeResult,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import DataSourceBadge from "./DataSourceBadge";
 
 // ── Mock data for demo mode ────────────────────────────────────
 
@@ -384,6 +385,7 @@ export default function InstitutionalMomentum() {
             {loading && (
               <span className="text-xs text-gray-500 animate-pulse">scanning…</span>
             )}
+            <DataSourceBadge dataSource={data.data_source} />
           </h3>
           <p className="text-xs text-gray-500 mt-0.5">
             Skip-month returns · Volatility-scaled weights · Regime overlay

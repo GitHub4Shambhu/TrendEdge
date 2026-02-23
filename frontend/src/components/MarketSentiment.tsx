@@ -18,6 +18,7 @@ import {
   SentimentMetricDetail,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import DataSourceBadge from "./DataSourceBadge";
 
 // ── Mock Data ───────────────────────────────────────────────────
 
@@ -273,6 +274,7 @@ export default function MarketSentiment() {
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
               Market Sentiment
               {useMock && <span className="text-xs text-yellow-500 font-normal">(Demo)</span>}
+              <DataSourceBadge dataSource={data.data_source} />
             </h2>
             <p className="text-xs text-gray-500">
               9 metrics · {data.window_size}-day rolling window · Z-score normalized

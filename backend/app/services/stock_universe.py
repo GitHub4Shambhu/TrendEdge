@@ -42,7 +42,7 @@ MOMENTUM_FAVORITES = [
     "NVDA", "AMD", "TSLA", "AAPL", "MSFT", "META", "GOOGL", "AMZN", "NFLX", "CRM",
     "COIN", "MARA", "RIOT", "MSTR", "PLTR", "SOFI", "HOOD", "RIVN", "LCID", "NIO",
     "SNOW", "NET", "CRWD", "DDOG", "ZS", "MDB", "PANW", "FTNT", "S", "OKTA",
-    "SQ", "PYPL", "SHOP", "MELI", "SE", "BABA", "JD", "PDD", "GRAB", "CPNG",
+    "XYZ", "PYPL", "SHOP", "MELI", "SE", "BABA", "JD", "PDD", "GRAB", "CPNG",
     "ROKU", "TTD", "PINS", "SNAP", "SPOT", "RBLX", "U", "MTCH", "BMBL", "ABNB",
     "UBER", "LYFT", "DASH", "DKNG", "PENN", "MGM", "WYNN", "LVS", "CZR", "RCL",
     "CCL", "NCLH", "AAL", "UAL", "DAL", "LUV", "SAVE", "JBLU", "ALK", "HA",
@@ -79,7 +79,7 @@ def get_quick_scan_universe() -> List[str]:
     # Top 50 most liquid/traded stocks
     return [
         "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "AMD", "NFLX", "CRM",
-        "ORCL", "INTC", "CSCO", "ADBE", "PYPL", "SQ", "SHOP", "UBER", "ABNB", "COIN",
+        "ORCL", "INTC", "CSCO", "ADBE", "PYPL", "XYZ", "SHOP", "UBER", "ABNB", "COIN",
         "PLTR", "SOFI", "HOOD", "RIVN", "LCID", "NIO", "SNOW", "NET", "CRWD", "DDOG",
         "MDB", "PANW", "ZS", "OKTA", "ROKU", "SNAP", "PINS", "SPOT", "RBLX", "U",
         "SPY", "QQQ", "IWM", "ARKK", "XLK", "XLF", "XLE", "SMH", "GLD", "TLT",
