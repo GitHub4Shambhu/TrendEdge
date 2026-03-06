@@ -6,9 +6,11 @@ All endpoints return typed responses for client type safety.
 """
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
+
+import asyncio
 
 from app.schemas.momentum import (
     AssetType,
@@ -28,6 +30,8 @@ from app.schemas.momentum import (
     MarketRegimeResult,
     SentimentMetricDetail,
     MarketSentimentResponse,
+    MarketCapCategory,
+    MarketCapMomentumResponse,
 )
 from app.services.momentum_service import get_momentum_service
 from app.services.sentiment_service import get_sentiment_service
@@ -37,6 +41,7 @@ from app.services.backtesting import get_backtesting_engine, BacktestConfig
 from app.services.max_risk_momentum import get_max_risk_engine, MaxRiskFactors, RegimeData
 from app.services.institutional_momentum import get_institutional_engine, InstitutionalFactors, MarketRegimeData
 from app.services.market_sentiment import get_sentiment_engine, SentimentResult, SentimentMetric
+from app.services.market_cap_universe import get_market_cap_service, MarketCapTier, TIER_ORDER, TIER_LABELS
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -885,6 +890,86 @@ async def institutional_analyze_symbol(symbol: str):
 
     factors.rank = 1
     return _factors_to_institutional_result(factors)
+
+
+# ============================================================================
+# Market Cap Momentum Endpoints
+# ============================================================================
+
+@router.get("/market-cap-momentum", response_model=MarketCapMomentumResponse)
+async def market_cap_momentum(
+    top_n: int = Query(5, ge=1, le=20, description="Top N opportunities per tier"),
+):
+    """
+    Scan the market grouped by market cap tier.
+
+    Uses the same advanced momentum algorithm across 5 tiers:
+    Mega (>$476.85B), Large ($81.98B-$476.85B), Medium ($13.73B-$81.98B),
+    Small ($3.50B-$13.73B), Micro (<$3.50B).
+
+    Scans all 5 tiers concurrently for speed.
+    """
+    import math
+
+    algorithm = get_momentum_algorithm()
+    mc_service = get_market_cap_service()
+
+    # Snapshot mock symbols before scan so we detect only new mocks from this request
+    mock_before = set(algorithm._mock_symbols) if hasattr(algorithm, "_mock_symbols") else set()
+
+    # 1. Collect all seed symbols across tiers (deduplicated)
+    all_symbols_set: set = set()
+    for tier in TIER_ORDER:
+        all_symbols_set.update(mc_service.get_symbols_for_tier(tier))
+    all_symbols = sorted(all_symbols_set)
+
+    # 2. Scan entire universe once (instead of 5 separate scans)
+    all_factors = await algorithm.scan_universe(all_symbols)
+
+    # Filter out NaN scores (delisted/broken symbols)
+    all_factors = [f for f in all_factors if not math.isnan(f.composite_score)]
+
+    # 3. Classify each symbol by actual market cap and bucket into tiers
+    tier_buckets: Dict[MarketCapTier, list] = {t: [] for t in TIER_ORDER}
+    for f in all_factors:
+        mc_val = mc_service._get_market_cap(f.symbol)
+        if mc_val is None:
+            continue
+        tier = mc_service.classify_symbol(f.symbol)
+        if tier is not None:
+            tier_buckets[tier].append((f, mc_val))
+
+    # 4. Build categories: sort by score descending, take top N
+    returned_symbols: List[str] = []
+    categories_list: List[MarketCapCategory] = []
+
+    for tier in TIER_ORDER:
+        bucket = tier_buckets[tier]
+        bucket.sort(key=lambda x: x[0].composite_score, reverse=True)
+        top_entries = bucket[:top_n]
+
+        opportunities = []
+        for i, (f, mc_val) in enumerate(top_entries):
+            opp = _create_opportunity_from_factors(i + 1, f)
+            opp.market_cap = mc_val
+            opportunities.append(opp)
+
+        returned_symbols.extend(f.symbol for f, _ in top_entries)
+        categories_list.append(MarketCapCategory(
+            tier=tier.value,
+            label=TIER_LABELS[tier],
+            opportunities=opportunities,
+            total_scanned=len(bucket),
+        ))
+
+    # Only stale if returned symbols were newly mocked during THIS scan
+    new_mocks = (algorithm._mock_symbols - mock_before) if hasattr(algorithm, "_mock_symbols") else set()
+    ds = "stale" if new_mocks & set(returned_symbols) else "live"
+
+    return MarketCapMomentumResponse(
+        categories=categories_list,
+        data_source=ds,
+    )
 
 
 # ============================================================================

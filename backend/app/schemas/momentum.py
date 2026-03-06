@@ -49,6 +49,7 @@ class TopOpportunity(BaseModel):
     risk_level: str = Field(..., description="Risk assessment: low/medium/high")
     target_price: Optional[float] = Field(None, description="Predicted target price")
     stop_loss: Optional[float] = Field(None, description="Suggested stop loss")
+    market_cap: Optional[float] = Field(None, description="Market capitalization in dollars")
 
 
 class DashboardResponse(BaseModel):
@@ -282,6 +283,29 @@ class InstitutionalPortfolioResponse(BaseModel):
     breadth: float = Field(0.0, description="% of universe above 200DMA")
     vol_scaling_enabled: bool = Field(True)
     total_scanned: int = Field(0)
+    scanned_at: datetime = Field(default_factory=datetime.utcnow)
+    data_source: str = Field("live", description="'live' if all data from yfinance, 'stale' if any mock fallback used")
+
+
+# ============================================================================
+# Market Sentiment Schemas
+# ============================================================================
+
+# ============================================================================
+# Market Cap Momentum Schemas
+# ============================================================================
+
+class MarketCapCategory(BaseModel):
+    """Single market cap tier with its top opportunities."""
+    tier: str = Field(..., description="Tier key: mega/large/medium/small/micro")
+    label: str = Field(..., description="Human-readable tier label")
+    opportunities: List[TopOpportunity] = Field(default_factory=list)
+    total_scanned: int = Field(0, description="Symbols scanned in this tier")
+
+
+class MarketCapMomentumResponse(BaseModel):
+    """Response containing momentum opportunities grouped by market cap tier."""
+    categories: List[MarketCapCategory] = Field(default_factory=list)
     scanned_at: datetime = Field(default_factory=datetime.utcnow)
     data_source: str = Field("live", description="'live' if all data from yfinance, 'stale' if any mock fallback used")
 

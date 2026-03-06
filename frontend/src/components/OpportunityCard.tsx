@@ -115,8 +115,16 @@ function ConfidenceRing({ confidence }: { confidence: number }) {
   );
 }
 
+function formatMarketCap(value: number | null | undefined): string {
+  if (value == null) return "";
+  if (value >= 1_000_000_000_000) return `$${(value / 1_000_000_000_000).toFixed(2)}T`;
+  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(2)}B`;
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  return `$${value.toLocaleString()}`;
+}
+
 export function OpportunityCard({ opportunity }: OpportunityCardProps) {
-  const { momentum, rank, reason, risk_level, target_price, stop_loss } = opportunity;
+  const { momentum, rank, reason, risk_level, target_price, stop_loss, market_cap } = opportunity;
   const signalStyle = getSignalStyle(momentum.signal);
   const trend = momentum.price_change_pct > 0.5 ? "up" : momentum.price_change_pct < -0.5 ? "down" : "neutral";
 
@@ -137,6 +145,11 @@ export function OpportunityCard({ opportunity }: OpportunityCardProps) {
           <div>
             <h3 className="text-xl font-bold text-white group-hover:text-blue-400 transition-colors">
               {momentum.symbol}
+              {market_cap != null && (
+                <span className="text-xs font-bold text-gray-400 ml-1.5">
+                  ({formatMarketCap(market_cap)})
+                </span>
+              )}
             </h3>
             <p className="text-xs text-gray-500 uppercase tracking-wider">{momentum.asset_type}</p>
           </div>

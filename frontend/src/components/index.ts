@@ -12,4 +12,5 @@ export { default as Backtesting } from "./Backtesting";
 export { default as MaxRiskMomentum } from "./MaxRiskMomentum";
 export { default as InstitutionalMomentum } from "./InstitutionalMomentum";
 export { default as MarketSentiment } from "./MarketSentiment";
+export { default as MarketCapMomentum } from "./MarketCapMomentum";
 export type { StockPerformanceData } from "./StockComparison";

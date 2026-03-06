@@ -28,6 +28,7 @@ export interface TopOpportunity {
   risk_level: "low" | "medium" | "high";
   target_price: number | null;
   stop_loss: number | null;
+  market_cap?: number | null;
 }
 
 export interface DashboardData {
@@ -128,6 +129,21 @@ export interface InstitutionalPortfolioResponse {
   breadth: number;
   vol_scaling_enabled: boolean;
   total_scanned: number;
+  data_source?: string;
+}
+
+// ── Market Cap Momentum Types ───────────────────────────────────
+
+export interface MarketCapCategory {
+  tier: string;
+  label: string;
+  opportunities: TopOpportunity[];
+  total_scanned: number;
+}
+
+export interface MarketCapMomentumResponse {
+  categories: MarketCapCategory[];
+  scanned_at: string;
   data_source?: string;
 }
 
@@ -282,6 +298,19 @@ class APIClient {
   ): Promise<InstitutionalMomentumResult> {
     return this.fetch<InstitutionalMomentumResult>(
       `/dashboard/institutional-analyze/${symbol}`
+    );
+  }
+
+  // ── Market Cap Momentum Methods ────────────────────────────
+
+  /**
+   * Get momentum opportunities grouped by market cap tier
+   */
+  async getMarketCapMomentum(
+    topN: number = 5
+  ): Promise<MarketCapMomentumResponse> {
+    return this.fetch<MarketCapMomentumResponse>(
+      `/dashboard/market-cap-momentum?top_n=${topN}`
     );
   }
 

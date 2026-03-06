@@ -15,6 +15,7 @@ import Backtesting from "@/components/Backtesting";
 import MaxRiskMomentum from "@/components/MaxRiskMomentum";
 import InstitutionalMomentum from "@/components/InstitutionalMomentum";
 import MarketSentiment from "@/components/MarketSentiment";
+import MarketCapMomentum from "@/components/MarketCapMomentum";
 import DataSourceBadge from "@/components/DataSourceBadge";
 import { formatRelativeTime } from "@/lib/utils";
 
@@ -286,6 +287,15 @@ export function Dashboard() {
             <OpportunityCard key={opp.momentum.symbol} opportunity={opp} />
           ))}
         </div>
+      </section>
+
+      {/* Market Cap Momentum */}
+      <section>
+        <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-purple-500" />
+          Market Cap Momentum
+        </h2>
+        <MarketCapMomentum />
       </section>
 
       {/* Performance Comparison Table */}
