@@ -1028,3 +1028,402 @@ async def market_sentiment(
     engine = get_sentiment_engine(window=window)
     result = await engine.compute()
     return _sentiment_result_to_response(result)
+
+
+# ============================================================================
+# Advanced Trend Identification Endpoints (7-technique ensemble)
+# ============================================================================
+
+from app.services.unified_trend import get_unified_trend_service
+from app.services.kalman_trend import get_kalman_service
+from app.services.hmm_regime import get_hmm_regime_service
+from app.services.transformer_trend import get_transformer_service
+from app.services.sector_neutral import get_sector_neutral_service
+from app.services.crash_protection import get_crash_protection_service
+from app.services.order_flow import get_ofi_service
+from app.services.gnn_contagion import get_gnn_service
+from app.services.stock_universe import get_quick_scan_universe as _quick_universe
+
+
+@router.get("/trend/unified/{symbol}")
+async def unified_trend_symbol(symbol: str):
+    """
+    Run all 7 trend-identification techniques for a single symbol.
+
+    Returns a composite trend score combining:
+    1. Kalman Filter adaptive trend + velocity
+    2. HMM market regime gate
+    3. PatchTST transformer temporal attention
+    4. Sector-neutral z-score (universe context skipped for single-symbol)
+    5. Momentum crash protection (volatility-scaled exposure)
+    6. Order Flow Imbalance signal
+    7. GNN contagion correction
+    """
+    service = get_unified_trend_service()
+    result = await service.analyze_symbol(symbol.upper())
+    return {
+        "symbol": result.symbol,
+        "final_score": result.final_score,
+        "signal": result.signal,
+        "confidence": result.confidence,
+        "components": {
+            "kalman_signal": result.kalman_signal,
+            "kalman_trend": result.kalman_trend,
+            "kalman_velocity": result.kalman_velocity,
+            "trend_direction": result.trend_direction,
+            "transformer_signal": result.transformer_signal,
+            "sector_neutral_z": result.sector_neutral_z,
+            "ofi_score": result.ofi_score,
+            "gnn_propagated": result.gnn_propagated,
+            "advanced_momentum": result.advanced_momentum,
+        },
+        "regime": {
+            "name": result.regime,
+            "multiplier": result.regime_multiplier,
+        },
+        "risk": {
+            "vol_regime": result.vol_regime,
+            "exposure_scalar": result.exposure_scalar,
+            "drawdown_from_peak": result.drawdown_from_peak,
+            "trend_exhausted": result.trend_exhausted,
+        },
+        "sector": {
+            "name": result.sector,
+            "sector_rank": result.sector_rank,
+            "universe_rank": result.universe_rank,
+        },
+        "gnn_context": {
+            "top_influencers": result.top_influencers,
+        },
+        "techniques_used": result.techniques_used,
+        "price": result.price,
+        "timestamp": result.timestamp.isoformat(),
+    }
+
+
+@router.get("/trend/unified")
+async def unified_trend_universe(
+    symbols: str = Query(
+        None,
+        description="Comma-separated symbols. Defaults to quick-scan universe (50 stocks).",
+    ),
+    limit: int = Query(20, ge=1, le=100, description="Max results to return"),
+):
+    """
+    Run the full 7-technique ensemble pipeline across a universe of symbols.
+
+    Returns ranked list with sector-neutral z-scores AND GNN contagion correction.
+    """
+    if symbols:
+        symbol_list = [s.strip().upper() for s in symbols.split(",")][:100]
+    else:
+        symbol_list = _quick_universe()[:50]
+
+    service = get_unified_trend_service()
+    universe = await service.analyze_universe(symbol_list)
+
+    regime = universe.regime
+    scores = universe.scores[:limit]
+
+    return {
+        "regime": {
+            "name": regime.regime.value,
+            "confidence": regime.confidence,
+            "days_in_regime": regime.days_in_regime,
+            "multiplier": regime.regime_multiplier,
+            "spy_return_1m": regime.spy_return_1m,
+            "spy_volatility": regime.spy_volatility,
+        },
+        "top_buys":  universe.top_buys,
+        "top_sells": universe.top_sells,
+        "results": [
+            {
+                "rank": i + 1,
+                "symbol": s.symbol,
+                "signal": s.signal,
+                "final_score": s.final_score,
+                "confidence": s.confidence,
+                "sector": s.sector,
+                "sector_rank": s.sector_rank,
+                "universe_rank": s.universe_rank,
+                "components": {
+                    "kalman": s.kalman_signal,
+                    "transformer": s.transformer_signal,
+                    "sector_z": s.sector_neutral_z,
+                    "ofi": s.ofi_score,
+                    "gnn": s.gnn_propagated,
+                    "advanced": s.advanced_momentum,
+                },
+                "regime_multiplier": s.regime_multiplier,
+                "exposure_scalar": s.exposure_scalar,
+                "vol_regime": s.vol_regime,
+                "trend_direction": s.trend_direction,
+                "top_influencers": s.top_influencers,
+                "price": s.price,
+            }
+            for i, s in enumerate(scores)
+        ],
+        "timestamp": universe.timestamp.isoformat(),
+    }
+
+
+@router.get("/trend/kalman/{symbol}")
+async def kalman_trend(symbol: str):
+    """
+    Kalman Filter adaptive trend for a single symbol.
+
+    Returns:
+    - kalman_trend:    smoothed price level (noise-filtered)
+    - kalman_velocity: rate-of-change of the latent trend (momentum proxy)
+    - kalman_signal:   normalised velocity z-score → [-1, +1]
+    - trend_strength:  |velocity| / price × 100 (% per day)
+    """
+    service = get_kalman_service()
+    r = await service.analyze(symbol.upper())
+    return {
+        "symbol": r.symbol,
+        "signal": r.signal,
+        "kalman_trend": r.kalman_trend,
+        "kalman_velocity": r.kalman_velocity,
+        "kalman_signal": r.kalman_signal,
+        "trend_strength": r.trend_strength,
+        "price_vs_trend_pct": r.price_vs_trend_pct,
+        "trend_direction": r.trend_direction,
+        "acceleration": r.acceleration,
+        "composite_signal": r.composite_signal,
+        "price": r.price,
+        "data_source": r.data_source,
+        "timestamp": r.timestamp.isoformat(),
+    }
+
+
+@router.get("/trend/regime")
+async def hmm_regime():
+    """
+    HMM-based market regime detection.
+
+    Fits a 3-state Gaussian Hidden Markov Model on SPY returns to classify
+    the current market as RISK_ON, NEUTRAL, or RISK_OFF.
+
+    Returns probabilistic confidence and regime persistence metrics.
+    """
+    service = get_hmm_regime_service()
+    r = await service.get_regime()
+    return {
+        "regime": r.regime.value,
+        "regime_probs": {
+            "RISK_OFF": round(r.regime_probs[0], 4),
+            "NEUTRAL":  round(r.regime_probs[1], 4),
+            "RISK_ON":  round(r.regime_probs[2], 4),
+        },
+        "confidence": r.confidence,
+        "days_in_regime": r.days_in_regime,
+        "transition_risk": r.transition_risk,
+        "regime_multiplier": r.regime_multiplier,
+        "spy_return_1m": r.spy_return_1m,
+        "spy_volatility": r.spy_volatility,
+        "timestamp": r.timestamp.isoformat(),
+    }
+
+
+@router.get("/trend/transformer/{symbol}")
+async def transformer_trend(symbol: str):
+    """
+    PatchTST Transformer temporal attention score for a single symbol.
+
+    Splits OHLCV history into 8-bar patches, applies self-attention across
+    the patch sequence, and outputs a trend score with attention weights
+    showing which historical patches the model focused on most.
+    """
+    service = get_transformer_service()
+    r = await service.analyze(symbol.upper())
+    return {
+        "symbol": r.symbol,
+        "signal": r.signal,
+        "transformer_signal": r.transformer_signal,
+        "confidence": r.confidence,
+        "model_mode": r.model_mode,
+        "n_patches": r.n_patches,
+        "patch_len": r.patch_len,
+        "attention_weights": r.attention_weights,
+        "patch_contributions": r.patch_contributions,
+        "peak_attention_patch": r.peak_attention_patch,
+        "peak_attention_age_days": r.peak_attention_age_days,
+        "price": r.price,
+        "data_source": r.data_source,
+        "timestamp": r.timestamp.isoformat(),
+    }
+
+
+@router.get("/trend/sector-neutral")
+async def sector_neutral_momentum(
+    symbols: str = Query(
+        None,
+        description="Comma-separated symbols. Defaults to quick-scan universe.",
+    ),
+    limit: int = Query(20, ge=1, le=100),
+):
+    """
+    Cross-sectional momentum with sector-neutral z-scores.
+
+    Computes skip-month multi-timeframe ROC, then z-scores each stock
+    within its GICS sector AND cross-sectionally, eliminating sector bias.
+
+    Alpha = 0.6 × sector_z + 0.4 × cross_z
+    """
+    if symbols:
+        symbol_list = [s.strip().upper() for s in symbols.split(",")][:100]
+    else:
+        symbol_list = _quick_universe()[:50]
+
+    service = get_sector_neutral_service()
+    universe = await service.analyze_universe(symbol_list)
+
+    return {
+        "sector_stats": universe.sector_stats,
+        "results": [
+            {
+                "rank": i + 1,
+                "symbol": r.symbol,
+                "sector": r.sector,
+                "signal": r.signal,
+                "blended_z": r.blended_z,
+                "sector_z": r.sector_z,
+                "cross_z": r.cross_z,
+                "sector_rank": r.sector_rank,
+                "sector_size": r.sector_size,
+                "universe_rank": r.universe_rank,
+                "returns": {
+                    "roc_1m": r.roc_1m,
+                    "roc_3m": r.roc_3m,
+                    "roc_6m": r.roc_6m,
+                    "roc_12m": r.roc_12m,
+                },
+                "raw_score": r.raw_score,
+                "price": r.price,
+            }
+            for i, r in enumerate(universe.results[:limit])
+        ],
+        "timestamp": universe.timestamp.isoformat(),
+    }
+
+
+@router.get("/trend/crash-protection/{symbol}")
+async def crash_protection(symbol: str):
+    """
+    Momentum crash protection assessment for a single symbol.
+
+    Returns:
+    - exposure_scalar:     position size multiplier [0.0 – 1.5]
+    - vol_regime:          LOW / NORMAL / ELEVATED / DANGER
+    - vol_ratio:           σ_10d / σ_60d  (>1.5 = ELEVATED, >2.2 = DANGER)
+    - trend_exhausted:     True if >12% below recent peak
+    - recommended_action:  FULL / REDUCED / MINIMAL / CASH
+    """
+    service = get_crash_protection_service()
+    r = await service.protect(symbol.upper(), raw_signal=0.0)
+    return {
+        "symbol": r.symbol,
+        "recommended_action": r.recommended_action.value,
+        "exposure_scalar": r.exposure_scalar,
+        "vol_regime": r.vol_regime.value,
+        "vol_ratio": r.vol_ratio,
+        "realised_vol_10d": r.realised_vol_10d,
+        "realised_vol_60d": r.realised_vol_60d,
+        "vol_scaled_signal": r.vol_scaled_signal,
+        "trend_exhausted": r.trend_exhausted,
+        "drawdown_from_peak": r.drawdown_from_peak,
+        "days_since_peak": r.days_since_peak,
+        "price": r.price,
+        "data_source": r.data_source,
+        "timestamp": r.timestamp.isoformat(),
+    }
+
+
+@router.get("/trend/ofi/{symbol}")
+async def order_flow_imbalance(symbol: str):
+    """
+    Order Flow Imbalance (OFI) signal for a single symbol.
+
+    Computes 3 complementary microstructure signals:
+    1. Tick-rule net order flow (directional volume accumulation)
+    2. Amihud liquidity-adjusted flow
+    3. VWAP deviation (intraday price pressure)
+
+    Combined via weighted average → ofi_score ∈ [-1, +1]
+    """
+    service = get_ofi_service()
+    r = await service.analyze(symbol.upper())
+    return {
+        "symbol": r.symbol,
+        "signal": r.signal,
+        "ofi_score": r.ofi_score,
+        "components": {
+            "tick_ofi": r.tick_ofi,
+            "liquidity_adj_ofi": r.liquidity_adj_ofi,
+            "vwap_deviation": r.vwap_deviation,
+        },
+        "dynamics": {
+            "ofi_momentum": r.ofi_momentum,
+            "ofi_persistence": r.ofi_persistence,
+        },
+        "microstructure": {
+            "dollar_volume_m": r.dollar_volume_m,
+            "amihud_illiq": r.amihud_illiq,
+            "spread_proxy": r.spread_proxy,
+        },
+        "price": r.price,
+        "data_source": r.data_source,
+        "timestamp": r.timestamp.isoformat(),
+    }
+
+
+@router.get("/trend/gnn-contagion")
+async def gnn_contagion(
+    symbols: str = Query(
+        None,
+        description="Comma-separated symbols. Defaults to top momentum basket.",
+    ),
+):
+    """
+    Graph Neural Network sector contagion propagation.
+
+    Builds a stock correlation graph and propagates momentum signals through
+    it using 2-layer GCN message passing.  A breakout in NVDA will create
+    a dampened signal in correlated peers (AMD, SMCI, TSM, etc.).
+
+    Returns propagated signals and the most influential neighbour nodes.
+    """
+    if symbols:
+        symbol_list = [s.strip().upper() for s in symbols.split(",")][:60]
+    else:
+        symbol_list = _quick_universe()[:30]
+
+    signals = {sym: 0.0 for sym in symbol_list}
+
+    service = get_gnn_service()
+    result = await service.propagate(signals)
+
+    return {
+        "graph_stats": {
+            "n_nodes": len(result.nodes),
+            "n_edges": result.n_edges,
+            "avg_correlation": result.avg_correlation,
+            "most_connected_symbol": result.most_connected_symbol,
+        },
+        "nodes": [
+            {
+                "symbol": n.symbol,
+                "propagated_signal": n.propagated_signal,
+                "original_signal": n.original_signal,
+                "contagion_score": n.contagion_score,
+                "degree": n.degree,
+                "avg_neighbour_signal": n.avg_neighbour_signal,
+                "top_influencers": n.top_influencers,
+                "influence_weights": n.influence_weights,
+                "signal": n.signal,
+            }
+            for n in result.nodes
+        ],
+        "timestamp": result.timestamp.isoformat(),
+    }
