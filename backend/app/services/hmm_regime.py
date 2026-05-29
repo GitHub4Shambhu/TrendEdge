@@ -211,8 +211,9 @@ class HMMRegimeResult:
     spy_volatility: float = 0.0
     breadth_pct: float = 0.5
 
-    regime_multiplier: float = 1.0
-    # RISK_ON=1.0, NEUTRAL=0.7, RISK_OFF=0.3
+    regime_multiplier: float = 0.7
+    # RISK_ON=1.0, NEUTRAL=0.7, RISK_OFF=0.3 — default to NEUTRAL's 0.7
+    # so a failed/early-return detection stays conservative (not full exposure).
 
     data_source: str = "live"
     timestamp: datetime = field(default_factory=datetime.utcnow)
@@ -263,9 +264,9 @@ class HMMRegimeService:
             volumes = hist["Volume"].values.astype(float)
 
             returns = np.diff(np.log(closes))
-            vol_20 = pd.Series(returns).rolling(20).std().fillna(method="bfill").values * np.sqrt(252)
+            vol_20 = pd.Series(returns).rolling(20).std().bfill().values * np.sqrt(252)
             vol_ratio = pd.Series(volumes[1:]).rolling(20).apply(
-                lambda x: x[-1] / (x[:-1].mean() + 1e-6)
+                lambda x: x[-1] / (x[:-1].mean() + 1e-6), raw=True
             ).fillna(1.0).values
 
             min_len = min(len(returns), len(vol_20), len(vol_ratio))

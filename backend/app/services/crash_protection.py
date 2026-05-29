@@ -188,7 +188,7 @@ class CrashProtectionService:
             drawdown = (closes[-1] - recent_peak) / (recent_peak + 1e-8)
             result.drawdown_from_peak = round(float(drawdown * 100), 2)
             result.days_since_peak = int(np.argmax(closes[-lookback:][::-1]))
-            result.trend_exhausted = drawdown < _EXHAUSTION_THRESHOLD
+            result.trend_exhausted = bool(drawdown < _EXHAUSTION_THRESHOLD)
 
             # Final exposure
             exposure = min(vol_scaled, regime_cap)

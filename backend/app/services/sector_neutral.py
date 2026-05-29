@@ -303,7 +303,11 @@ class SectorNeutralMomentumService:
         df["sector_z"] = 0.0
         for sector, grp in df.groupby("sector"):
             s_mean = grp["raw_score"].mean()
-            s_std = grp["raw_score"].std() + 1e-8
+            s_std = grp["raw_score"].std()
+            # std() is NaN for single-member sectors (ddof=1) — treat as no dispersion.
+            if pd.isna(s_std):
+                s_std = 0.0
+            s_std += 1e-8
             df.loc[grp.index, "sector_z"] = (grp["raw_score"] - s_mean) / s_std
             top_idx = grp["raw_score"].idxmax()
             sector_stats[str(sector)] = {
@@ -314,10 +318,17 @@ class SectorNeutralMomentumService:
             }
 
         cs_mean = df["sector_z"].mean()
-        cs_std = df["sector_z"].std() + 1e-8
+        cs_std = df["sector_z"].std()
+        if pd.isna(cs_std):
+            cs_std = 0.0
+        cs_std += 1e-8
         df["cross_z"] = (df["sector_z"] - cs_mean) / cs_std
 
         df["blended_z"] = self.ALPHA * df["sector_z"] + (1 - self.ALPHA) * df["cross_z"]
+
+        # Guard against any residual NaN before integer ranking.
+        for col in ("sector_z", "cross_z", "blended_z"):
+            df[col] = df[col].fillna(0.0)
 
         df["universe_rank"] = df["blended_z"].rank(ascending=False).astype(int)
         df["sector_rank"] = df.groupby("sector")["blended_z"].rank(ascending=False).astype(int)
