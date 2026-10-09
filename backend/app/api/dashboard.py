@@ -38,6 +38,8 @@ from app.schemas.momentum import (
     WatchlistResponse,
     SectorPerformance,
     SectorRotationResponse,
+    PerformanceRowResult,
+    PerformanceComparisonResponse,
 )
 from app.services.momentum_service import get_momentum_service
 from app.services.sentiment_service import get_sentiment_service
@@ -47,6 +49,7 @@ from app.services.backtesting import get_backtesting_engine, BacktestConfig
 from app.services.max_risk_momentum import get_max_risk_engine, MaxRiskFactors, RegimeData
 from app.services.institutional_momentum import get_institutional_engine, InstitutionalFactors, MarketRegimeData
 from app.services.market_sentiment import get_sentiment_engine, SentimentResult, SentimentMetric
+from app.services.performance_comparison import get_performance_service, PerformanceRow
 from app.services.market_cap_universe import get_market_cap_service, MarketCapTier, TIER_ORDER, TIER_LABELS
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
@@ -211,6 +214,16 @@ def _create_opportunity(rank: int, momentum: MomentumScore) -> TopOpportunity:
     )
 
 
+def _data_source_for(engine, symbols) -> str:
+    """'stale' only if a symbol actually returned fell back to mock data.
+
+    Engines are shared singletons whose _mock_symbols accumulates across all
+    requests (delisted tickers, typo lookups), so checking the whole set would
+    flag unrelated responses as stale.
+    """
+    return "stale" if engine._mock_symbols & set(symbols) else "live"
+
+
 @router.get("/", response_model=DashboardResponse)
 async def get_dashboard(use_advanced: bool = Query(True, description="Use advanced AI algorithm")):
     """
@@ -282,10 +295,9 @@ async def get_dashboard(use_advanced: bool = Query(True, description="Use advanc
     # Market sentiment
     market_sentiment = await sentiment_service.get_market_sentiment()
 
-    # Determine data_source
     ds = "live"
-    if use_advanced and hasattr(algorithm, 'data_source') and algorithm.data_source == "stale":
-        ds = "stale"
+    if use_advanced:
+        ds = _data_source_for(algorithm, [o.momentum.symbol for o in top_stocks + top_etfs])
 
     return DashboardResponse(
         top_stocks=top_stocks,
@@ -756,7 +768,7 @@ async def max_risk_portfolio(
         regime=_regime_data_to_result(regime),
         use_turbo=use_turbo,
         total_scanned=len(all_factors),
-        data_source=engine.data_source,
+        data_source=_data_source_for(engine, [f.symbol for f in top_picks + all_factors[:30]]),
     )
 
 
@@ -859,7 +871,7 @@ async def institutional_portfolio(
     - Filter: avg daily $ volume ≥ $50M, above 200DMA
     - Rank by vol-adjusted score
     - Weight by inverse volatility (1/σ)
-    - Market regime overlay: reduce exposure in BEAR regime
+    - Market regime (BULL / BEAR / NEUTRAL) reported for context
 
     Returns top N holdings plus full ranking and market regime info.
     """
@@ -884,7 +896,7 @@ async def institutional_portfolio(
         breadth=round(breadth, 1),
         vol_scaling_enabled=vol_scaling,
         total_scanned=len(all_factors),
-        data_source=engine.data_source,
+        data_source=_data_source_for(engine, [f.symbol for f in portfolio + all_factors[:30]]),
     )
 
 
@@ -922,9 +934,6 @@ async def market_cap_momentum(
     """
     algorithm = get_momentum_algorithm()
     mc_service = get_market_cap_service()
-
-    # Snapshot mock symbols before scan so we detect only new mocks from this request
-    mock_before = set(algorithm._mock_symbols) if hasattr(algorithm, "_mock_symbols") else set()
 
     # 1. Collect all seed symbols across tiers (deduplicated)
     all_symbols_set: set = set()
@@ -971,9 +980,7 @@ async def market_cap_momentum(
             total_scanned=len(bucket),
         ))
 
-    # Only stale if returned symbols were newly mocked during THIS scan
-    new_mocks = (algorithm._mock_symbols - mock_before) if hasattr(algorithm, "_mock_symbols") else set()
-    ds = "stale" if new_mocks & set(returned_symbols) else "live"
+    ds = _data_source_for(algorithm, returned_symbols)
 
     return MarketCapMomentumResponse(
         categories=categories_list,
@@ -1608,8 +1615,7 @@ async def sector_rotation():
         spy.rank = 0
         benchmark = _factors_to_sector(spy, "S&P 500")
 
-    returned = set(SECTOR_SPDRS) | {"SPY"}
-    ds = "stale" if engine._mock_symbols & returned else "live"
+    ds = _data_source_for(engine, list(SECTOR_SPDRS) + ["SPY"])
 
     return SectorRotationResponse(
         sectors=sectors,
@@ -1617,4 +1623,64 @@ async def sector_rotation():
         leaders=[s.symbol for s in sectors[:3]],
         laggards=[s.symbol for s in sectors[-3:]][::-1] if len(sectors) >= 6 else [],
         data_source=ds,
+    )
+
+
+# ============================================================================
+# Performance Comparison Endpoint
+# ============================================================================
+
+def _perf_row_to_result(row: PerformanceRow) -> PerformanceRowResult:
+    """Round values and turn NaN (gaps in Yahoo history) into None."""
+    def clean(v):
+        if v is None or (isinstance(v, float) and math.isnan(v)):
+            return None
+        return round(v, 2)
+
+    return PerformanceRowResult(
+        symbol=row.symbol,
+        price=round(row.price, 2),
+        change=clean(row.change) or 0.0,
+        perf_week=clean(row.perf_week),
+        perf_month=clean(row.perf_month),
+        perf_quarter=clean(row.perf_quarter),
+        perf_half=clean(row.perf_half),
+        perf_ytd=clean(row.perf_ytd),
+        perf_year=clean(row.perf_year),
+        perf_3y=clean(row.perf_3y),
+        perf_5y=clean(row.perf_5y),
+        volatility_week=clean(row.volatility_week),
+        volatility_month=clean(row.volatility_month),
+        avg_volume=clean(row.avg_volume),
+        rel_volume=clean(row.rel_volume),
+        volume=clean(row.volume),
+    )
+
+
+@router.get("/performance-comparison", response_model=PerformanceComparisonResponse)
+async def performance_comparison(
+    captured: str = Query("", description="Comma-separated tickers the momentum scan picked"),
+    missed_n: int = Query(10, ge=1, le=25, description="How many missed movers to return"),
+):
+    """
+    Real multi-timeframe performance for the scan's picks ("captured") and for
+    the quick-scan universe's top 1-month movers that the scan did not pick
+    ("missed"). Returns 1W / 1M / 3M / 6M / YTD / 1Y / 3Y / 5Y, volatility and volume.
+    """
+    captured_list = list(dict.fromkeys(s.strip().upper() for s in captured.split(",") if s.strip()))
+    if len(captured_list) > 20:
+        raise HTTPException(status_code=400, detail="Maximum 20 captured symbols allowed")
+
+    universe = get_quick_scan_universe()
+    rows = await get_performance_service().get_rows(captured_list + universe)
+
+    captured_rows = [rows[s] for s in captured_list if s in rows]
+    taken = set(captured_list)
+    candidates = [rows[s] for s in universe if s in rows and s not in taken and rows[s].perf_month is not None]
+    candidates.sort(key=lambda r: r.perf_month, reverse=True)
+
+    return PerformanceComparisonResponse(
+        captured=[_perf_row_to_result(r) for r in captured_rows],
+        missed=[_perf_row_to_result(r) for r in candidates[:missed_n]],
+        universe_size=len(universe),
     )

@@ -410,3 +410,36 @@ class SectorRotationResponse(BaseModel):
     laggards: List[str] = Field(default_factory=list, description="Bottom 3 sectors")
     scanned_at: datetime = Field(default_factory=datetime.utcnow)
     data_source: str = Field("live")
+
+
+# ============================================================================
+# Performance Comparison Schemas
+# ============================================================================
+
+class PerformanceRowResult(BaseModel):
+    """Multi-timeframe performance for one ticker. Returns in %; None = not enough history."""
+    symbol: str
+    price: float
+    change: float = Field(..., description="1-day % change")
+    perf_week: Optional[float] = None
+    perf_month: Optional[float] = None
+    perf_quarter: Optional[float] = None
+    perf_half: Optional[float] = None
+    perf_ytd: Optional[float] = None
+    perf_year: Optional[float] = None
+    perf_3y: Optional[float] = None
+    perf_5y: Optional[float] = None
+    volatility_week: Optional[float] = Field(None, description="Avg daily high-low range %, last 5 days")
+    volatility_month: Optional[float] = Field(None, description="Avg daily high-low range %, last 21 days")
+    avg_volume: Optional[float] = Field(None, description="63-day average daily volume (shares)")
+    rel_volume: Optional[float] = Field(None, description="Last day volume / avg_volume")
+    volume: Optional[float] = None
+
+
+class PerformanceComparisonResponse(BaseModel):
+    """Scan picks vs the universe's biggest 1-month movers the scan did not pick."""
+    captured: List[PerformanceRowResult] = Field(default_factory=list)
+    missed: List[PerformanceRowResult] = Field(default_factory=list)
+    universe_size: int = Field(0, description="Tickers the missed list was drawn from")
+    scanned_at: datetime = Field(default_factory=datetime.utcnow)
+    data_source: str = Field("live")

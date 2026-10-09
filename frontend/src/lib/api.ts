@@ -275,6 +275,35 @@ export interface SectorRotationResponse {
   data_source?: string;
 }
 
+// ── Performance Comparison Types ────────────────────────────────
+
+export interface PerformanceRow {
+  symbol: string;
+  price: number;
+  change: number;
+  perf_week: number | null;
+  perf_month: number | null;
+  perf_quarter: number | null;
+  perf_half: number | null;
+  perf_ytd: number | null;
+  perf_year: number | null;
+  perf_3y: number | null;
+  perf_5y: number | null;
+  volatility_week: number | null;
+  volatility_month: number | null;
+  avg_volume: number | null;
+  rel_volume: number | null;
+  volume: number | null;
+}
+
+export interface PerformanceComparisonResponse {
+  captured: PerformanceRow[];
+  missed: PerformanceRow[];
+  universe_size: number;
+  scanned_at: string;
+  data_source?: string;
+}
+
 class APIClient {
   private baseUrl: string;
 
@@ -458,6 +487,17 @@ class APIClient {
    */
   async getSectorRotation(): Promise<SectorRotationResponse> {
     return this.fetch<SectorRotationResponse>("/dashboard/sector-rotation");
+  }
+
+  // ── Performance Comparison Methods ────────────────────────
+
+  /**
+   * Real multi-timeframe performance: scan picks vs top 1-month movers it missed
+   */
+  async getPerformanceComparison(captured: string[]): Promise<PerformanceComparisonResponse> {
+    return this.fetch<PerformanceComparisonResponse>(
+      `/dashboard/performance-comparison?captured=${encodeURIComponent(captured.join(","))}`
+    );
   }
 }
 

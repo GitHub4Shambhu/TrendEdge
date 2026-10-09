@@ -17,7 +17,7 @@ SP500_SYMBOLS = [
     "CRM", "ACN", "DHR", "NKE", "ADBE", "TXN", "NEE", "PM", "UPS", "MS",
     "RTX", "HON", "ORCL", "IBM", "QCOM", "LOW", "UNP", "SPGI", "INTU", "BA",
     "GE", "AMAT", "CAT", "DE", "AMD", "ISRG", "BKNG", "MDLZ", "ADP", "GILD",
-    "SBUX", "ADI", "MMC", "LMT", "TJX", "VRTX", "SYK", "REGN", "CI", "CB",
+    "SBUX", "ADI", "MRSH", "LMT", "TJX", "VRTX", "SYK", "REGN", "CI", "CB",
     "BDX", "CVS", "MO", "SCHW", "DUK", "SO", "ZTS", "PLD", "BSX", "EQIX",
     "CME", "CL", "ITW", "NOC", "ICE", "SHW", "MU", "MCO", "PGR", "EOG",
     "WM", "HUM", "FDX", "EMR", "PSA", "SNPS", "ORLY", "GD", "CDNS", "APD",

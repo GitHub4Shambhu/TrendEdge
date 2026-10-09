@@ -8,28 +8,28 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
-import { TopOpportunity } from "@/lib/api";
+import { useState, useMemo, useEffect } from "react";
+import { apiClient, PerformanceRow, TopOpportunity } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
 
 export interface StockPerformanceData {
   rank: number;
   ticker: string;
-  perfWeek: number;
-  perfMonth: number;
-  perfQuarter: number;
-  perfHalf: number;
-  perfYTD: number;
+  perfWeek: number | null;
+  perfMonth: number | null;
+  perfQuarter: number | null;
+  perfHalf: number | null;
+  perfYTD: number | null;
   perfYear: number | null;
   perf3Y: number | null;
   perf5Y: number | null;
-  volatilityWeek: number;
-  volatilityMonth: number;
+  volatilityWeek: number | null;
+  volatilityMonth: number | null;
   avgVolume: string;
-  relVolume: number;
+  relVolume: number | null;
   price: number;
   change: number;
-  volume: number;
+  volume: number | null;
 }
 
 interface StockComparisonProps {
@@ -38,7 +38,8 @@ interface StockComparisonProps {
 }
 
 // Format large numbers (volume)
-function formatVolume(vol: number): string {
+function formatVolume(vol: number | null): string {
+  if (vol === null) return "-";
   if (vol >= 1_000_000_000) return `${(vol / 1_000_000_000).toFixed(2)}B`;
   if (vol >= 1_000_000) return `${(vol / 1_000_000).toFixed(2)}M`;
   if (vol >= 1_000) return `${(vol / 1_000).toFixed(2)}K`;
@@ -59,37 +60,54 @@ function formatPerfPercent(value: number | null): string {
   return `${value >= 0 ? "" : ""}${value.toFixed(2)}%`;
 }
 
-// Generate performance data from momentum stocks
-function generatePerformanceFromMomentum(opp: TopOpportunity, rank: number): StockPerformanceData {
-  const { momentum } = opp;
-  
-  // Derive multi-timeframe performance from current momentum data
-  const weekPerf = momentum.price_change_pct;
-  const monthPerf = weekPerf * (1.5 + Math.random() * 2);
-  const quarterPerf = monthPerf * (1.2 + Math.random() * 1.5);
-  
+// Map a backend performance row to table data
+function fromPerformanceRow(row: PerformanceRow, rank: number): StockPerformanceData {
   return {
     rank,
-    ticker: momentum.symbol,
-    perfWeek: weekPerf,
-    perfMonth: monthPerf,
-    perfQuarter: quarterPerf,
-    perfHalf: quarterPerf * (0.8 + Math.random()),
-    perfYTD: quarterPerf * (0.6 + Math.random() * 0.8),
-    perfYear: quarterPerf * (1 + Math.random()),
-    perf3Y: Math.random() > 0.3 ? quarterPerf * (2 + Math.random() * 3) : null,
-    perf5Y: Math.random() > 0.4 ? quarterPerf * (3 + Math.random() * 5) : null,
-    volatilityWeek: 2 + Math.random() * 6,
-    volatilityMonth: 2 + Math.random() * 5,
-    avgVolume: `${(5 + Math.random() * 40).toFixed(2)}M`,
-    relVolume: momentum.volume_ratio,
-    price: momentum.price,
-    change: momentum.price_change_pct,
-    volume: Math.floor(5_000_000 + Math.random() * 50_000_000),
+    ticker: row.symbol,
+    perfWeek: row.perf_week,
+    perfMonth: row.perf_month,
+    perfQuarter: row.perf_quarter,
+    perfHalf: row.perf_half,
+    perfYTD: row.perf_ytd,
+    perfYear: row.perf_year,
+    perf3Y: row.perf_3y,
+    perf5Y: row.perf_5y,
+    volatilityWeek: row.volatility_week,
+    volatilityMonth: row.volatility_month,
+    avgVolume: formatVolume(row.avg_volume),
+    relVolume: row.rel_volume,
+    price: row.price,
+    change: row.change,
+    volume: row.volume,
   };
 }
 
-// Mock data for demonstration (stocks NOT captured by momentum algorithm)
+// Demo mode (no backend): only the fields the scan itself knows; the rest stay blank
+function demoFromMomentum(opp: TopOpportunity, rank: number): StockPerformanceData {
+  const { momentum } = opp;
+  return {
+    rank,
+    ticker: momentum.symbol,
+    perfWeek: null,
+    perfMonth: null,
+    perfQuarter: null,
+    perfHalf: null,
+    perfYTD: null,
+    perfYear: null,
+    perf3Y: null,
+    perf5Y: null,
+    volatilityWeek: null,
+    volatilityMonth: null,
+    avgVolume: "-",
+    relVolume: momentum.volume_ratio,
+    price: momentum.price,
+    change: momentum.price_change_pct,
+    volume: null,
+  };
+}
+
+// Demo-mode sample of "missed" stocks, shown only when the backend is unreachable
 const MOCK_COMPARISON_DATA: StockPerformanceData[] = [
   {
     rank: 1,
@@ -298,22 +316,54 @@ export function StockComparison({ momentumStocks = [], performanceData }: StockC
   const [sortField, setSortField] = useState<SortField>("perfWeek");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
+  const [live, setLive] = useState<{ captured: PerformanceRow[]; missed: PerformanceRow[]; universe: number } | null>(null);
+  const [useMock, setUseMock] = useState(false);
+
+  const capturedKey = momentumStocks.map(s => s.momentum.symbol).join(",");
+
+  useEffect(() => {
+    if (performanceData) return;
+    let cancelled = false;
+    apiClient
+      .getPerformanceComparison(capturedKey ? capturedKey.split(",") : [])
+      .then(res => {
+        if (cancelled) return;
+        setLive({ captured: res.captured, missed: res.missed, universe: res.universe_size });
+        setUseMock(false);
+      })
+      .catch(err => {
+        if (cancelled) return;
+        console.warn("API unavailable, using demo data:", err);
+        setLive(null);
+        setUseMock(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [capturedKey, performanceData]);
 
   // Build comparison data combining momentum stocks with market data
   const comparisonData = useMemo((): ComparisonRow[] => {
     const capturedTickers = new Set(momentumStocks.map(s => s.momentum.symbol));
     
-    // Convert momentum stocks to performance data
-    const capturedData: ComparisonRow[] = momentumStocks.map((opp, idx) => ({
-      ...generatePerformanceFromMomentum(opp, idx + 1),
-      captured: true,
-      momentumScore: opp.momentum.score,
-      signal: opp.momentum.signal,
-      confidence: opp.momentum.confidence,
-    }));
+    // Captured: the scan's picks, with real performance when the backend answered
+    const liveRows = new Map((live?.captured ?? []).map(r => [r.symbol, r]));
+    const capturedData: ComparisonRow[] = momentumStocks.map((opp, idx) => {
+      const row = liveRows.get(opp.momentum.symbol);
+      return {
+        ...(row ? fromPerformanceRow(row, idx + 1) : demoFromMomentum(opp, idx + 1)),
+        captured: true,
+        momentumScore: opp.momentum.score,
+        signal: opp.momentum.signal,
+        confidence: opp.momentum.confidence,
+      };
+    });
 
-    // Add missed stocks (filter out any that might be in momentum)
-    const missedData: ComparisonRow[] = (performanceData || MOCK_COMPARISON_DATA)
+    // Missed: the universe's top 1-month movers the scan did not pick
+    const missedSource: StockPerformanceData[] =
+      performanceData ??
+      (live ? live.missed.map((r, i) => fromPerformanceRow(r, i + 1)) : useMock ? MOCK_COMPARISON_DATA : []);
+    const missedData: ComparisonRow[] = missedSource
       .filter(stock => !capturedTickers.has(stock.ticker))
       .map((stock, idx) => ({
         ...stock,
@@ -322,7 +372,7 @@ export function StockComparison({ momentumStocks = [], performanceData }: StockC
       }));
 
     return [...capturedData, ...missedData];
-  }, [momentumStocks, performanceData]);
+  }, [momentumStocks, performanceData, live, useMock]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -392,7 +442,11 @@ export function StockComparison({ momentumStocks = [], performanceData }: StockC
               </svg>
               Performance Comparison
             </h3>
-            <p className="text-xs text-gray-500 mt-1">Multi-timeframe analysis • Momentum algorithm coverage</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Multi-timeframe analysis • Missed = top 1-month movers
+              {live ? ` of ${live.universe} scanned tickers` : ""} not picked by the scan
+              {useMock && <span className="ml-2 text-yellow-500">(Demo)</span>}
+            </p>
           </div>
           
           {/* Filter buttons */}
@@ -598,7 +652,7 @@ export function StockComparison({ momentumStocks = [], performanceData }: StockC
                 
                 {/* Volatility */}
                 <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-300">
-                  {stock.volatilityWeek.toFixed(2)}%
+                  {stock.volatilityWeek === null ? "-" : `${stock.volatilityWeek.toFixed(2)}%`}
                 </td>
                 
                 {/* Volume metrics */}
@@ -606,11 +660,11 @@ export function StockComparison({ momentumStocks = [], performanceData }: StockC
                   {stock.avgVolume}
                 </td>
                 <td className={`px-2 py-3 whitespace-nowrap text-sm font-medium ${
-                  stock.relVolume > 1.5 ? "text-blue-400" : 
-                  stock.relVolume > 1.0 ? "text-gray-300" : 
+                  (stock.relVolume ?? 0) > 1.5 ? "text-blue-400" : 
+                  (stock.relVolume ?? 0) > 1.0 ? "text-gray-300" : 
                   "text-gray-500"
                 }`}>
-                  {stock.relVolume.toFixed(2)}
+                  {stock.relVolume === null ? "-" : stock.relVolume.toFixed(2)}
                 </td>
                 
                 {/* Price */}

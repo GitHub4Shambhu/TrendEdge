@@ -386,9 +386,9 @@ class InstitutionalMomentumEngine:
         Build institutional momentum portfolio.
 
         Returns: (top_picks, market_regime, breadth)
-        - Filters by liquidity
+        - Filters by liquidity and trend (above 200DMA)
         - Applies volatility scaling for position sizing
-        - Adjusts for market regime
+        - Assesses market regime (reported alongside the picks)
         """
         all_factors = await self.scan_universe(symbols)
         regime = await self.assess_market_regime()
@@ -406,11 +406,11 @@ class InstitutionalMomentumEngine:
         else:
             filtered = all_factors
 
-        # In BEAR regime, only pick stocks above 200DMA
-        if regime.regime == MarketRegime.BEAR:
-            above_dma = [f for f in filtered if f.above_200dma]
-            if len(above_dma) >= 3:
-                filtered = above_dma
+        # Trend filter: only hold stocks above their 200DMA (a stock below it
+        # signals SELL, so holding it would contradict its own signal)
+        above_dma = [f for f in filtered if f.above_200dma]
+        if len(above_dma) >= 3:
+            filtered = above_dma
 
         # Volatility scaling: normalize 1/σ weights
         if use_vol_scaling and filtered:

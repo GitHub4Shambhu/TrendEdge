@@ -49,7 +49,7 @@ TIER_SEEDS: Dict[MarketCapTier, List[str]] = {
     MarketCapTier.LARGE: [
         "ISRG", "INTU", "BKNG", "UBER", "TXN", "NOW", "QCOM", "HON", "IBM",
         "AMAT", "GE", "CAT", "BA", "LOW", "DE", "SPGI", "ADP", "SBUX",
-        "ADI", "GILD", "VRTX", "MMC", "LMT", "SYK", "REGN", "CI", "CB",
+        "ADI", "GILD", "VRTX", "MRSH", "LMT", "SYK", "REGN", "CI", "CB",
         "MDLZ", "BDX", "SCHW",
     ],
     MarketCapTier.MEDIUM: [
@@ -59,17 +59,17 @@ TIER_SEEDS: Dict[MarketCapTier, List[str]] = {
         "COIN", "SNAP", "PINS", "RBLX", "SPOT", "OKTA", "VEEV",
     ],
     MarketCapTier.SMALL: [
-        "U", "BILL", "PCOR", "DOCS", "BRZE", "ALRM", "CWAN", "CARG",
-        "SMCI", "AFRM", "HIMS", "DUOL", "PATH", "GLBE", "CFLT",
+        "U", "BILL", "PCOR", "DOCS", "BRZE", "ALRM", "CARG",
+        "SMCI", "AFRM", "HIMS", "DUOL", "PATH", "GLBE",
         "APPS", "ASAN", "GTLB", "ESTC", "HOOD", "SOFI", "RIVN", "LCID",
         "NIO", "UPST", "IONQ", "JOBY", "CELH", "TMDX",
     ],
     MarketCapTier.MICRO: [
         "SNDL", "TLRY", "DNA", "GSAT", "OPEN", "CLOV",
         "BARK", "OUST", "STEM", "ARQQ", "BIRD", "NNOX",
-        "MNDY", "FIGS", "EVGO", "CHPT", "BLNK", "WKHS", "GOEV",
+        "MNDY", "FIGS", "EVGO", "CHPT", "BLNK", "WKHS",
         "QS", "MVST", "PAYO", "BTBT", "MARA", "RIOT",
-        "GEVO", "ORGN", "ASTS", "AMPX", "BEEM",
+        "GEVO", "ASTS", "AMPX", "BEEM",
     ],
 }
 

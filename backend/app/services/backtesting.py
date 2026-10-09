@@ -197,7 +197,9 @@ class BacktestingEngine:
     def _calculate_momentum_signal(
         self, 
         hist: pd.DataFrame, 
-        date_idx: int
+        date_idx: int,
+        buy_threshold: float = 0.15,
+        sell_threshold: float = -0.10,
     ) -> Tuple[float, str, float]:
         """
         Calculate momentum signal for a specific date.
@@ -280,9 +282,9 @@ class BacktestingEngine:
         composite = np.clip(composite, -1, 1)
         
         # Determine signal
-        if composite > 0.15:
+        if composite > buy_threshold:
             signal = "BUY"
-        elif composite < -0.10:
+        elif composite < sell_threshold:
             signal = "SELL"
         else:
             signal = "HOLD"
@@ -415,7 +417,9 @@ class BacktestingEngine:
                     except ValueError:
                         continue
                     
-                    score, signal, confidence = self._calculate_momentum_signal(df, idx)
+                    score, signal, confidence = self._calculate_momentum_signal(
+                        df, idx, config.momentum_buy_threshold, config.momentum_sell_threshold
+                    )
                     signals.append((symbol, score, signal, confidence))
                 
                 # Sort by score (best opportunities first)
