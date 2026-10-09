@@ -171,6 +171,110 @@ export interface MarketSentimentResponse {
   data_source?: string;
 }
 
+// ── Symbol Lookup & Watchlist Types ─────────────────────────────
+
+export type EngineSignal = "BUY" | "SELL" | "HOLD";
+export type Consensus = "BULLISH" | "BEARISH" | "MIXED" | "NEUTRAL";
+
+export interface AdvancedAnalysis {
+  symbol: string;
+  signal: EngineSignal;
+  composite_score: number;
+  price: number;
+  price_change: number;
+  momentum: {
+    roc_5d: number;
+    roc_10d: number;
+    roc_20d: number;
+    roc_60d: number;
+    trend_score: number;
+  };
+  volume: { ratio: number; trend: number; accumulation: number };
+  technicals: {
+    rsi_14: number;
+    rsi_7: number;
+    macd_signal: number;
+    macd_histogram: number;
+    bb_position: number;
+    adx: number;
+    atr_percent: number;
+    sma_20_distance: number;
+    sma_50_distance: number;
+    sma_200_distance: number;
+    ema_crossover: number;
+    obv_trend: number;
+    mfi: number;
+    stochastic_k: number;
+    stochastic_d: number;
+  };
+  ai_prediction: { score: number; confidence: number };
+  risk: { volatility_score: number };
+  timestamp: string;
+}
+
+export interface SymbolLookupResponse {
+  symbol: string;
+  price: number;
+  price_change_pct: number;
+  advanced: AdvancedAnalysis | null;
+  max_risk: MaxRiskScoreResult | null;
+  institutional: InstitutionalMomentumResult | null;
+  consensus: Consensus;
+  buy_votes: number;
+  sell_votes: number;
+  timestamp: string;
+  data_source?: string;
+}
+
+export interface WatchlistItem {
+  symbol: string;
+  price: number;
+  price_change_pct: number;
+  advanced_signal: EngineSignal | null;
+  advanced_score: number | null;
+  max_risk_signal: EngineSignal | null;
+  max_risk_score: number | null;
+  institutional_signal: EngineSignal | null;
+  institutional_score: number | null;
+  consensus: Consensus;
+  data_source: string;
+}
+
+export interface WatchlistResponse {
+  items: WatchlistItem[];
+  not_found: string[];
+  scanned_at: string;
+  data_source?: string;
+}
+
+// ── Sector Rotation Types ───────────────────────────────────────
+
+export interface SectorPerformance {
+  symbol: string;
+  name: string;
+  rank: number;
+  price: number;
+  r1w: number;
+  r1m: number;
+  r3m: number;
+  r6m: number;
+  r12m: number;
+  rs3m: number;
+  rs6m: number;
+  distance_to_200dma: number;
+  momentum_score: number;
+  signal: EngineSignal;
+}
+
+export interface SectorRotationResponse {
+  sectors: SectorPerformance[];
+  benchmark: SectorPerformance | null;
+  leaders: string[];
+  laggards: string[];
+  scanned_at: string;
+  data_source?: string;
+}
+
 class APIClient {
   private baseUrl: string;
 
@@ -325,6 +429,35 @@ class APIClient {
     return this.fetch<MarketSentimentResponse>(
       `/dashboard/market-sentiment?window=${window}`
     );
+  }
+
+  // ── Symbol Lookup & Watchlist Methods ─────────────────────
+
+  /**
+   * Analyze any ticker with all three engines at once
+   */
+  async lookupSymbol(symbol: string): Promise<SymbolLookupResponse> {
+    return this.fetch<SymbolLookupResponse>(
+      `/dashboard/lookup/${encodeURIComponent(symbol)}`
+    );
+  }
+
+  /**
+   * Multi-engine snapshot for a list of tickers (max 25)
+   */
+  async getWatchlist(symbols: string[]): Promise<WatchlistResponse> {
+    return this.fetch<WatchlistResponse>(
+      `/dashboard/watchlist?symbols=${encodeURIComponent(symbols.join(","))}`
+    );
+  }
+
+  // ── Sector Rotation Methods ───────────────────────────────
+
+  /**
+   * Multi-horizon performance of the 11 sector SPDR ETFs
+   */
+  async getSectorRotation(): Promise<SectorRotationResponse> {
+    return this.fetch<SectorRotationResponse>("/dashboard/sector-rotation");
   }
 }
 

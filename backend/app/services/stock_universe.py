@@ -5,7 +5,7 @@ Manages the universe of US stocks to scan for momentum opportunities.
 Includes S&P 500, NASDAQ 100, and high-volume stocks.
 """
 
-from typing import List, Set
+from typing import Dict, List, Set
 import httpx
 import pandas as pd
 
@@ -61,6 +61,22 @@ SECTOR_ETFS = [
     "USO", "XOP",  # Oil
     "TLT", "HYG", "LQD",  # Bonds
 ]
+
+
+# Select Sector SPDR ETFs — one per GICS sector, used for sector rotation
+SECTOR_SPDRS: Dict[str, str] = {
+    "XLK": "Technology",
+    "XLC": "Communication Services",
+    "XLY": "Consumer Discretionary",
+    "XLF": "Financials",
+    "XLI": "Industrials",
+    "XLB": "Materials",
+    "XLE": "Energy",
+    "XLV": "Health Care",
+    "XLP": "Consumer Staples",
+    "XLU": "Utilities",
+    "XLRE": "Real Estate",
+}
 
 
 def get_full_universe() -> List[str]:

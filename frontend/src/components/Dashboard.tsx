@@ -17,6 +17,9 @@ import InstitutionalMomentum from "@/components/InstitutionalMomentum";
 import MarketSentiment from "@/components/MarketSentiment";
 import MarketCapMomentum from "@/components/MarketCapMomentum";
 import DataSourceBadge from "@/components/DataSourceBadge";
+import SymbolSearch from "@/components/SymbolSearch";
+import Watchlist from "@/components/Watchlist";
+import SectorRotation from "@/components/SectorRotation";
 import { formatRelativeTime } from "@/lib/utils";
 
 // Mock data for development when backend is not running
@@ -267,6 +270,24 @@ export function Dashboard() {
         </button>
       </div>
 
+      {/* Symbol Search — any ticker through all three engines */}
+      <section>
+        <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-cyan-500" />
+          Ticker Deep-Dive
+        </h2>
+        <SymbolSearch />
+      </section>
+
+      {/* Watchlist */}
+      <section>
+        <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-yellow-500" />
+          My Watchlist
+        </h2>
+        <Watchlist />
+      </section>
+
       {/* Market Sentiment — 9-metric rolling window model */}
       <section>
         <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
@@ -274,6 +295,15 @@ export function Dashboard() {
           Market Sentiment Model
         </h2>
         <MarketSentiment />
+      </section>
+
+      {/* Sector Rotation Heatmap */}
+      <section>
+        <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-teal-500" />
+          Sector Rotation
+        </h2>
+        <SectorRotation />
       </section>
 
       {/* Top Stocks */}

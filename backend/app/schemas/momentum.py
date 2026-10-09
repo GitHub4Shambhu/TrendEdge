@@ -7,7 +7,7 @@ Clear typing enables AI agents to understand data structures.
 
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -336,3 +336,77 @@ class MarketSentimentResponse(BaseModel):
     window_size: int = Field(20, description="Rolling window W (trading days)")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     data_source: str = Field("live", description="'live' if computed from yfinance, 'stale' if fallback used")
+
+
+# ============================================================================
+# Symbol Lookup & Watchlist Schemas
+# ============================================================================
+
+class SymbolLookupResponse(BaseModel):
+    """Unified analysis of one symbol across all three momentum engines."""
+    symbol: str = Field(..., description="Ticker symbol")
+    price: float = Field(0.0)
+    price_change_pct: float = Field(0.0, description="1-day % change")
+    advanced: Optional[Dict[str, Any]] = Field(None, description="Advanced AI momentum breakdown")
+    max_risk: Optional[MaxRiskScoreResult] = Field(None)
+    institutional: Optional[InstitutionalMomentumResult] = Field(None)
+    consensus: str = Field("NEUTRAL", description="BULLISH / BEARISH / MIXED / NEUTRAL")
+    buy_votes: int = Field(0, ge=0, le=3)
+    sell_votes: int = Field(0, ge=0, le=3)
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    data_source: str = Field("live", description="'live' if from yfinance, 'stale' if mock fallback used")
+
+
+class WatchlistItem(BaseModel):
+    """Compact multi-engine snapshot for a watchlist row."""
+    symbol: str
+    price: float = 0.0
+    price_change_pct: float = 0.0
+    advanced_signal: Optional[str] = None
+    advanced_score: Optional[float] = None
+    max_risk_signal: Optional[str] = None
+    max_risk_score: Optional[float] = None
+    institutional_signal: Optional[str] = None
+    institutional_score: Optional[float] = None
+    consensus: str = "NEUTRAL"
+    data_source: str = "live"
+
+
+class WatchlistResponse(BaseModel):
+    """Watchlist snapshot."""
+    items: List[WatchlistItem] = Field(default_factory=list)
+    not_found: List[str] = Field(default_factory=list, description="Symbols no engine could analyze")
+    scanned_at: datetime = Field(default_factory=datetime.utcnow)
+    data_source: str = Field("live")
+
+
+# ============================================================================
+# Sector Rotation Schemas
+# ============================================================================
+
+class SectorPerformance(BaseModel):
+    """Multi-horizon performance of one sector ETF."""
+    symbol: str
+    name: str
+    rank: int = Field(0, description="Rank by Max Risk score (1 = strongest)")
+    price: float = 0.0
+    r1w: float = Field(0.0, description="1-week return %")
+    r1m: float = Field(0.0, description="1-month return %")
+    r3m: float = Field(0.0, description="3-month return %")
+    r6m: float = Field(0.0, description="6-month return %")
+    r12m: float = Field(0.0, description="12-month return %")
+    rs3m: float = Field(0.0, description="3M relative strength vs SPY")
+    rs6m: float = Field(0.0, description="6M relative strength vs SPY")
+    distance_to_200dma: float = Field(0.0, description="% above/below 200DMA")
+    momentum_score: float = Field(0.0, description="Max Risk momentum score")
+    signal: str = "HOLD"
+
+
+class SectorRotationResponse(BaseModel):
+    """Sector rotation heatmap data."""
+    sectors: List[SectorPerformance] = Field(default_factory=list)
+    benchmark: Optional[SectorPerformance] = Field(None, description="SPY reference row")
+    leaders: List[str] = Field(default_factory=list, description="Top 3 sectors")
+    laggards: List[str] = Field(default_factory=list, description="Bottom 3 sectors")
+    scanned_at: datetime = Field(default_factory=datetime.utcnow)
+    data_source: str = Field("live")

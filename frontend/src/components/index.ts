@@ -13,4 +13,8 @@ export { default as MaxRiskMomentum } from "./MaxRiskMomentum";
 export { default as InstitutionalMomentum } from "./InstitutionalMomentum";
 export { default as MarketSentiment } from "./MarketSentiment";
 export { default as MarketCapMomentum } from "./MarketCapMomentum";
+export { default as SymbolSearch } from "./SymbolSearch";
+export { default as Watchlist } from "./Watchlist";
+export { default as SectorRotation } from "./SectorRotation";
+export { SignalPill, ConsensusBadge } from "./SignalBadges";
 export type { StockPerformanceData } from "./StockComparison";

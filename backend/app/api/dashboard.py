@@ -5,8 +5,9 @@ Provides endpoints for the main dashboard functionality.
 All endpoints return typed responses for client type safety.
 """
 
+import math
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -32,11 +33,16 @@ from app.schemas.momentum import (
     MarketSentimentResponse,
     MarketCapCategory,
     MarketCapMomentumResponse,
+    SymbolLookupResponse,
+    WatchlistItem,
+    WatchlistResponse,
+    SectorPerformance,
+    SectorRotationResponse,
 )
 from app.services.momentum_service import get_momentum_service
 from app.services.sentiment_service import get_sentiment_service
 from app.services.advanced_momentum import get_momentum_algorithm, MomentumFactors
-from app.services.stock_universe import get_quick_scan_universe, get_sector_etfs
+from app.services.stock_universe import get_quick_scan_universe, get_sector_etfs, SECTOR_SPDRS
 from app.services.backtesting import get_backtesting_engine, BacktestConfig
 from app.services.max_risk_momentum import get_max_risk_engine, MaxRiskFactors, RegimeData
 from app.services.institutional_momentum import get_institutional_engine, InstitutionalFactors, MarketRegimeData
@@ -334,7 +340,11 @@ async def analyze_symbol_advanced(symbol: str):
     if factors is None:
         raise HTTPException(status_code=404, detail=f"Could not analyze symbol: {symbol}")
     
-    # Return detailed analysis
+    return _advanced_analysis_dict(factors)
+
+
+def _advanced_analysis_dict(factors: MomentumFactors) -> dict:
+    """Detailed advanced-momentum breakdown for a single symbol."""
     return {
         "symbol": factors.symbol,
         "signal": factors.signal,
@@ -774,7 +784,8 @@ def _factors_to_institutional_result(factors: InstitutionalFactors) -> Instituti
     return InstitutionalMomentumResult(
         symbol=factors.symbol,
         rank=factors.rank,
-        quintile=factors.quintile,
+        # Quintiles are only assigned in a universe scan; unranked → middle bucket
+        quintile=factors.quintile or 3,
         price=factors.price,
         r12_skip1=round(factors.r12_skip1, 2),
         r6_skip1=round(factors.r6_skip1, 2),
@@ -909,8 +920,6 @@ async def market_cap_momentum(
 
     Scans all 5 tiers concurrently for speed.
     """
-    import math
-
     algorithm = get_momentum_algorithm()
     mc_service = get_market_cap_service()
 
@@ -1427,3 +1436,185 @@ async def gnn_contagion(
         ],
         "timestamp": result.timestamp.isoformat(),
     }
+
+
+# ============================================================================
+# Symbol Lookup & Watchlist Endpoints
+# ============================================================================
+
+def _consensus(signals: List[Optional[str]]) -> Tuple[str, int, int]:
+    """Majority vote across engine signals → (consensus, buy_votes, sell_votes)."""
+    buys = sum(1 for s in signals if s == "BUY")
+    sells = sum(1 for s in signals if s == "SELL")
+    if buys >= 2:
+        return "BULLISH", buys, sells
+    if sells >= 2:
+        return "BEARISH", buys, sells
+    if buys or sells:
+        return "MIXED", buys, sells
+    return "NEUTRAL", buys, sells
+
+
+async def _analyze_all_engines(symbol: str) -> Optional[SymbolLookupResponse]:
+    """Run advanced, max-risk and institutional engines concurrently on one symbol."""
+    algorithm = get_momentum_algorithm()
+    max_risk = get_max_risk_engine()
+    institutional = get_institutional_engine()
+
+    adv, mr, inst = await asyncio.gather(
+        algorithm.analyze_symbol(symbol),
+        max_risk.analyze_single(symbol),
+        institutional.analyze_single(symbol),
+        return_exceptions=True,
+    )
+    adv = adv if isinstance(adv, MomentumFactors) and not math.isnan(adv.composite_score) else None
+    mr = mr if isinstance(mr, MaxRiskFactors) else None
+    inst = inst if isinstance(inst, InstitutionalFactors) else None
+
+    if adv is None and mr is None and inst is None:
+        return None
+
+    if mr is not None:
+        mr.rank = 1
+    if inst is not None:
+        inst.rank = 1
+
+    consensus, buys, sells = _consensus([
+        adv.signal if adv else None,
+        mr.signal if mr else None,
+        inst.signal if inst else None,
+    ])
+
+    # Engines fall back to synthetic data when yfinance has nothing for a symbol
+    mocked = (
+        symbol in algorithm._mock_symbols
+        or symbol in max_risk._mock_symbols
+        or symbol in institutional._mock_symbols
+    )
+
+    price = adv.price if adv else (mr.price if mr else inst.price)
+    return SymbolLookupResponse(
+        symbol=symbol,
+        price=round(float(price), 2),
+        price_change_pct=round(float(adv.price_change), 2) if adv else 0.0,
+        advanced=_advanced_analysis_dict(adv) if adv else None,
+        max_risk=_factors_to_max_risk_result(mr) if mr else None,
+        institutional=_factors_to_institutional_result(inst) if inst else None,
+        consensus=consensus,
+        buy_votes=buys,
+        sell_votes=sells,
+        data_source="stale" if mocked else "live",
+    )
+
+
+@router.get("/lookup/{symbol}", response_model=SymbolLookupResponse)
+async def lookup_symbol(symbol: str):
+    """
+    Analyze any ticker with all three engines at once.
+
+    Runs Advanced AI Momentum, Max Risk Momentum and Institutional Momentum
+    concurrently and returns a majority-vote consensus
+    (BULLISH / BEARISH / MIXED / NEUTRAL).
+    """
+    result = await _analyze_all_engines(symbol.strip().upper())
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Could not analyze symbol: {symbol}")
+    return result
+
+
+@router.get("/watchlist", response_model=WatchlistResponse)
+async def watchlist(
+    symbols: str = Query(..., description="Comma-separated ticker symbols (max 25)"),
+):
+    """
+    Compact multi-engine snapshot for a list of tickers.
+
+    Each row carries the signal and score from every engine plus the consensus.
+    """
+    symbol_list = list(dict.fromkeys(s.strip().upper() for s in symbols.split(",") if s.strip()))
+    if not symbol_list:
+        raise HTTPException(status_code=400, detail="At least one symbol is required")
+    if len(symbol_list) > 25:
+        raise HTTPException(status_code=400, detail="Maximum 25 symbols allowed")
+
+    results = await asyncio.gather(*(_analyze_all_engines(s) for s in symbol_list))
+
+    items: List[WatchlistItem] = []
+    not_found: List[str] = []
+    for sym, r in zip(symbol_list, results):
+        if r is None:
+            not_found.append(sym)
+            continue
+        items.append(WatchlistItem(
+            symbol=r.symbol,
+            price=r.price,
+            price_change_pct=r.price_change_pct,
+            advanced_signal=r.advanced["signal"] if r.advanced else None,
+            advanced_score=r.advanced["composite_score"] if r.advanced else None,
+            max_risk_signal=r.max_risk.signal if r.max_risk else None,
+            max_risk_score=r.max_risk.max_risk_score if r.max_risk else None,
+            institutional_signal=r.institutional.signal if r.institutional else None,
+            institutional_score=r.institutional.vol_adjusted_score if r.institutional else None,
+            consensus=r.consensus,
+            data_source=r.data_source,
+        ))
+
+    ds = "stale" if any(i.data_source == "stale" for i in items) else "live"
+    return WatchlistResponse(items=items, not_found=not_found, data_source=ds)
+
+
+# ============================================================================
+# Sector Rotation Endpoints
+# ============================================================================
+
+def _factors_to_sector(factors: MaxRiskFactors, name: str) -> SectorPerformance:
+    """Convert MaxRiskFactors for a sector ETF into a heatmap row."""
+    return SectorPerformance(
+        symbol=factors.symbol,
+        name=name,
+        rank=factors.rank,
+        price=round(factors.price, 2),
+        r1w=round(factors.r1w, 2),
+        r1m=round(factors.r1m, 2),
+        r3m=round(factors.return_3m, 2),
+        r6m=round(factors.return_6m, 2),
+        r12m=round(factors.return_12m, 2),
+        rs3m=round(factors.rs3m, 2),
+        rs6m=round(factors.rs6m, 2),
+        distance_to_200dma=round((factors.price_to_200dma - 1) * 100, 2),
+        momentum_score=round(factors.max_risk_score, 2),
+        signal=factors.signal,
+    )
+
+
+@router.get("/sector-rotation", response_model=SectorRotationResponse)
+async def sector_rotation():
+    """
+    Sector rotation heatmap across the 11 Select Sector SPDR ETFs.
+
+    Returns 1W / 1M / 3M / 6M / 12M returns, relative strength vs SPY,
+    distance to 200DMA and Max Risk momentum score, ranked strongest first.
+    """
+    engine = get_max_risk_engine()
+
+    sector_factors, spy = await asyncio.gather(
+        engine.scan_universe(list(SECTOR_SPDRS.keys())),
+        engine.analyze_single("SPY"),
+    )
+
+    sectors = [_factors_to_sector(f, SECTOR_SPDRS[f.symbol]) for f in sector_factors]
+    benchmark = None
+    if spy is not None:
+        spy.rank = 0
+        benchmark = _factors_to_sector(spy, "S&P 500")
+
+    returned = set(SECTOR_SPDRS) | {"SPY"}
+    ds = "stale" if engine._mock_symbols & returned else "live"
+
+    return SectorRotationResponse(
+        sectors=sectors,
+        benchmark=benchmark,
+        leaders=[s.symbol for s in sectors[:3]],
+        laggards=[s.symbol for s in sectors[-3:]][::-1] if len(sectors) >= 6 else [],
+        data_source=ds,
+    )
