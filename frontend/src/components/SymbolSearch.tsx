@@ -10,6 +10,7 @@
 import { FormEvent, ReactNode, useState } from "react";
 import { apiClient, EngineSignal, SymbolLookupResponse } from "@/lib/api";
 import { useWatchlist } from "@/lib/watchlist";
+import { mockLookup } from "@/lib/demoData";
 import { cn, formatCurrency, formatPercent, getValueColor } from "@/lib/utils";
 import DataSourceBadge from "./DataSourceBadge";
 import { ConsensusBadge, SignalPill } from "./SignalBadges";
@@ -65,6 +66,7 @@ export default function SymbolSearch() {
   const [result, setResult] = useState<SymbolLookupResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [useMock, setUseMock] = useState(false);
   const watchlist = useWatchlist();
 
   const lookup = async (raw: string) => {
@@ -75,13 +77,17 @@ export default function SymbolSearch() {
     setError(null);
     try {
       setResult(await apiClient.lookupSymbol(symbol));
+      setUseMock(false);
     } catch (err) {
-      setResult(null);
-      setError(
-        err instanceof Error && err.message.includes("404")
-          ? `No data found for ${symbol}.`
-          : "Lookup failed — is the backend running?"
-      );
+      if (err instanceof Error && err.message.startsWith("API Error")) {
+        // Backend answered but couldn't analyze the symbol
+        setResult(null);
+        setError(err.message.includes("404") ? `No data found for ${symbol}.` : "Lookup failed.");
+      } else {
+        console.warn("API unavailable, using demo data:", err);
+        setResult(mockLookup(symbol));
+        setUseMock(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -153,6 +159,7 @@ export default function SymbolSearch() {
               <span className="text-xl text-gray-200 tabular-nums">{formatCurrency(result.price)}</span>
               <Pct value={result.price_change_pct} />
               <DataSourceBadge dataSource={result.data_source} />
+              {useMock && <span className="text-xs text-yellow-500">(Demo)</span>}
             </div>
             <div className="flex items-center gap-3">
               <div className="text-right">

@@ -10,6 +10,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { apiClient, WatchlistResponse } from "@/lib/api";
 import { useWatchlist, WATCHLIST_MAX } from "@/lib/watchlist";
+import { mockWatchlist } from "@/lib/demoData";
 import { formatCurrency, formatPercent, getValueColor } from "@/lib/utils";
 import DataSourceBadge from "./DataSourceBadge";
 import { ConsensusBadge, SignalPill } from "./SignalBadges";
@@ -24,6 +25,7 @@ export default function Watchlist() {
   const [data, setData] = useState<WatchlistResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [useMock, setUseMock] = useState(false);
   const [input, setInput] = useState("");
 
   const symbolsKey = symbols.join(",");
@@ -37,8 +39,15 @@ export default function Watchlist() {
     setError(null);
     try {
       setData(await apiClient.getWatchlist(symbolsKey.split(",")));
-    } catch {
-      setError("Could not load watchlist — is the backend running?");
+      setUseMock(false);
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith("API Error")) {
+        setError("Could not load watchlist.");
+      } else {
+        console.warn("API unavailable, using demo data:", err);
+        setData(mockWatchlist(symbolsKey.split(",")));
+        setUseMock(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -69,6 +78,7 @@ export default function Watchlist() {
             {symbols.length}/{WATCHLIST_MAX} symbols
           </span>
           <DataSourceBadge dataSource={data?.data_source} />
+          {useMock && <span className="text-xs text-yellow-500">(Demo)</span>}
         </div>
         <div className="flex gap-2">
           <form onSubmit={onAdd} className="flex gap-2">

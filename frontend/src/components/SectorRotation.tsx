@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiClient, SectorPerformance, SectorRotationResponse } from "@/lib/api";
 import { cn, formatPercent } from "@/lib/utils";
+import { MOCK_SECTOR_ROTATION } from "@/lib/demoData";
 import DataSourceBadge from "./DataSourceBadge";
 import { SignalPill } from "./SignalBadges";
 
@@ -39,6 +40,7 @@ export default function SectorRotation() {
   const [data, setData] = useState<SectorRotationResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [useMock, setUseMock] = useState(false);
   const [sortKey, setSortKey] = useState<MetricKey>("momentum_score");
 
   const fetchData = useCallback(async () => {
@@ -46,8 +48,15 @@ export default function SectorRotation() {
     setError(null);
     try {
       setData(await apiClient.getSectorRotation());
-    } catch {
-      setError("Could not load sector data — is the backend running?");
+      setUseMock(false);
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith("API Error")) {
+        setError("Could not load sector data.");
+      } else {
+        console.warn("API unavailable, using demo data:", err);
+        setData(MOCK_SECTOR_ROTATION);
+        setUseMock(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -126,6 +135,7 @@ export default function SectorRotation() {
           )}
         </div>
         <div className="flex items-center gap-3">
+          {useMock && <span className="text-xs text-yellow-500">(Demo)</span>}
           <DataSourceBadge dataSource={data.data_source} />
           <button
             onClick={fetchData}
