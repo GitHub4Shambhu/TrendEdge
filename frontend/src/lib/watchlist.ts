@@ -1,51 +1,102 @@
 /**
  * TrendEdge Frontend - Watchlist Store
  *
- * Persists the user's watchlist in localStorage and keeps every component
- * that uses it (search panel, watchlist table) in sync.
+ * Keeps the user's watchlist in localStorage and, when the backend is
+ * reachable, mirrors it to the server so the scheduled signal-change check
+ * can score it.  The server copy wins on load; an empty server list is
+ * seeded from the browser copy.  Without a backend it stays local-only.
  */
 
 "use client";
 
 import { useCallback, useSyncExternalStore } from "react";
+import { apiClient, SavedWatchlistEntry } from "@/lib/api";
 
 const STORAGE_KEY = "trendedge:watchlist";
 export const WATCHLIST_MAX = 25;
 const DEFAULT_WATCHLIST = ["NVDA", "AAPL", "MSFT"];
-const EMPTY: string[] = [];
+
+interface WatchlistState {
+  symbols: string[];
+  /** Symbols with signal-change alerts switched off */
+  alertsOff: ReadonlySet<string>;
+  /** True once the server copy has been loaded */
+  synced: boolean;
+}
+
+const SERVER_STATE: WatchlistState = { symbols: [], alertsOff: new Set(), synced: false };
 
 const listeners = new Set<() => void>();
-let cache: string[] | null = null;
+let state: WatchlistState | null = null;
+let syncStarted = false;
 
-function read(): string[] {
-  if (cache) return cache;
+function readLocal(): string[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : DEFAULT_WATCHLIST;
-    cache = Array.isArray(parsed)
+    return Array.isArray(parsed)
       ? parsed.filter((s): s is string => typeof s === "string")
       : DEFAULT_WATCHLIST;
   } catch {
-    cache = DEFAULT_WATCHLIST;
+    return DEFAULT_WATCHLIST;
   }
-  return cache;
 }
 
-function write(next: string[]) {
-  cache = next;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  } catch {
-    // Storage unavailable (private mode, quota) — keep in-memory only
+function read(): WatchlistState {
+  if (!state) state = { symbols: readLocal(), alertsOff: new Set(), synced: false };
+  return state;
+}
+
+function setState(next: Partial<WatchlistState>) {
+  const prev = read();
+  state = { ...prev, ...next };
+  if (next.symbols && next.symbols !== prev.symbols) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next.symbols));
+    } catch {
+      // Storage unavailable (private mode, quota) — keep in-memory only
+    }
   }
   listeners.forEach((l) => l());
 }
 
+function applyServer(entries: SavedWatchlistEntry[]) {
+  setState({
+    symbols: entries.map((e) => e.symbol),
+    alertsOff: new Set(entries.filter((e) => !e.alerts_enabled).map((e) => e.symbol)),
+    synced: true,
+  });
+}
+
+async function syncFromServer() {
+  try {
+    const { symbols } = await apiClient.getSavedWatchlist();
+    if (symbols.length > 0) {
+      applyServer(symbols);
+    } else {
+      applyServer((await apiClient.saveWatchlist(read().symbols)).symbols);
+    }
+  } catch {
+    // Backend unavailable — stay local-only (alerts disabled)
+  }
+}
+
+function writeSymbols(next: string[]) {
+  setState({ symbols: next });
+  if (read().synced) {
+    apiClient.saveWatchlist(next).catch((err) => console.warn("Watchlist save failed:", err));
+  }
+}
+
 function subscribe(listener: () => void) {
   listeners.add(listener);
+  if (!syncStarted) {
+    syncStarted = true;
+    syncFromServer();
+  }
   const onStorage = (e: StorageEvent) => {
     if (e.key === STORAGE_KEY) {
-      cache = null;
+      state = { ...read(), symbols: readLocal() };
       listener();
     }
   };
@@ -57,20 +108,41 @@ function subscribe(listener: () => void) {
 }
 
 export function useWatchlist() {
-  const symbols = useSyncExternalStore(subscribe, read, () => EMPTY);
+  const { symbols, alertsOff, synced } = useSyncExternalStore(subscribe, read, () => SERVER_STATE);
 
   const add = useCallback((symbol: string) => {
     const s = symbol.trim().toUpperCase();
-    const current = read();
+    const current = read().symbols;
     if (!s || current.includes(s) || current.length >= WATCHLIST_MAX) return;
-    write([...current, s]);
+    writeSymbols([...current, s]);
   }, []);
 
   const remove = useCallback((symbol: string) => {
-    write(read().filter((s) => s !== symbol));
+    writeSymbols(read().symbols.filter((s) => s !== symbol));
   }, []);
 
   const has = useCallback((symbol: string) => symbols.includes(symbol), [symbols]);
 
-  return { symbols, add, remove, has, isFull: symbols.length >= WATCHLIST_MAX };
+  const alertsEnabled = useCallback((symbol: string) => !alertsOff.has(symbol), [alertsOff]);
+
+  const toggleAlerts = useCallback(async (symbol: string) => {
+    const enable = read().alertsOff.has(symbol);
+    try {
+      applyServer((await apiClient.setAlertsEnabled(symbol, enable)).symbols);
+    } catch (err) {
+      console.warn("Alert toggle failed:", err);
+    }
+  }, []);
+
+  return {
+    symbols,
+    add,
+    remove,
+    has,
+    isFull: symbols.length >= WATCHLIST_MAX,
+    /** Whether the list is saved on the server (alerts available) */
+    synced,
+    alertsEnabled,
+    toggleAlerts,
+  };
 }
