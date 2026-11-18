@@ -443,3 +443,46 @@ class PerformanceComparisonResponse(BaseModel):
     universe_size: int = Field(0, description="Tickers the missed list was drawn from")
     scanned_at: datetime = Field(default_factory=datetime.utcnow)
     data_source: str = Field("live")
+
+
+# ============================================================================
+# Watchlist Alert Schemas
+# ============================================================================
+
+class SavedWatchlistEntry(BaseModel):
+    """One server-side watchlist symbol."""
+    symbol: str
+    alerts_enabled: bool = True
+
+
+class SavedWatchlistResponse(BaseModel):
+    """The persisted watchlist, in display order."""
+    symbols: List[SavedWatchlistEntry] = Field(default_factory=list)
+
+
+class SavedWatchlistUpdate(BaseModel):
+    """Replace the persisted watchlist."""
+    symbols: List[str] = Field(default_factory=list)
+
+
+class AlertToggleRequest(BaseModel):
+    alerts_enabled: bool
+
+
+class AlertEventResult(BaseModel):
+    """A consensus change detected by the scheduled check."""
+    id: int
+    symbol: str
+    previous: str
+    current: str
+    price: float
+    message: str
+    created_at: datetime
+    notified: bool = False
+
+
+class AlertEventsResponse(BaseModel):
+    events: List[AlertEventResult] = Field(default_factory=list)
+    last_check: Optional[datetime] = None
+    market_open: bool = False
+    webhook_configured: bool = False

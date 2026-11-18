@@ -1,8 +1,9 @@
 /**
  * TrendEdge Frontend - Watchlist Component
  *
- * Personal list of tickers (persisted in the browser) with the latest
- * signal from every momentum engine and their consensus.
+ * Personal list of tickers (saved on the server, or in the browser when the
+ * backend is unavailable) with the latest signal from every momentum engine,
+ * their consensus, and alerts when that consensus changes.
  */
 
 "use client";
@@ -13,6 +14,7 @@ import { useWatchlist, WATCHLIST_MAX } from "@/lib/watchlist";
 import { mockWatchlist } from "@/lib/demoData";
 import { formatCurrency, formatPercent, getValueColor } from "@/lib/utils";
 import DataSourceBadge from "./DataSourceBadge";
+import SignalAlerts from "./SignalAlerts";
 import { ConsensusBadge, SignalPill } from "./SignalBadges";
 
 function Score({ value, digits = 2 }: { value: number | null; digits?: number }) {
@@ -21,7 +23,7 @@ function Score({ value, digits = 2 }: { value: number | null; digits?: number })
 }
 
 export default function Watchlist() {
-  const { symbols, add, remove, isFull } = useWatchlist();
+  const { symbols, add, remove, isFull, synced, alertsEnabled, toggleAlerts } = useWatchlist();
   const [data, setData] = useState<WatchlistResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -167,7 +169,17 @@ export default function Watchlist() {
                         </td>
                       </>
                     )}
-                    <td className="px-3 py-3 text-right">
+                    <td className="px-3 py-3 text-right whitespace-nowrap">
+                      {synced && (
+                        <button
+                          onClick={() => toggleAlerts(symbol)}
+                          aria-label={`${alertsEnabled(symbol) ? "Mute" : "Enable"} alerts for ${symbol}`}
+                          title={alertsEnabled(symbol) ? "Alerts on" : "Alerts off"}
+                          className={`mr-3 ${alertsEnabled(symbol) ? "text-yellow-400" : "text-gray-600 hover:text-gray-400"}`}
+                        >
+                          {alertsEnabled(symbol) ? "🔔" : "🔕"}
+                        </button>
+                      )}
                       <button
                         onClick={() => remove(symbol)}
                         aria-label={`Remove ${symbol}`}
@@ -183,6 +195,8 @@ export default function Watchlist() {
           </table>
         </div>
       )}
+
+      {synced && <SignalAlerts symbolsKey={symbolsKey} />}
     </div>
   );
 }

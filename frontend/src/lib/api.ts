@@ -247,6 +247,35 @@ export interface WatchlistResponse {
   data_source?: string;
 }
 
+// ── Watchlist Alert Types ───────────────────────────────────────
+
+export interface SavedWatchlistEntry {
+  symbol: string;
+  alerts_enabled: boolean;
+}
+
+export interface SavedWatchlistResponse {
+  symbols: SavedWatchlistEntry[];
+}
+
+export interface AlertEvent {
+  id: number;
+  symbol: string;
+  previous: Consensus;
+  current: Consensus;
+  price: number;
+  message: string;
+  created_at: string;
+  notified: boolean;
+}
+
+export interface AlertEventsResponse {
+  events: AlertEvent[];
+  last_check: string | null;
+  market_open: boolean;
+  webhook_configured: boolean;
+}
+
 // ── Sector Rotation Types ───────────────────────────────────────
 
 export interface SectorPerformance {
@@ -478,6 +507,43 @@ class APIClient {
     return this.fetch<WatchlistResponse>(
       `/dashboard/watchlist?symbols=${encodeURIComponent(symbols.join(","))}`
     );
+  }
+
+  // ── Watchlist Alert Methods ───────────────────────────────
+
+  /**
+   * Server-side watchlist (what the scheduled alert check scores)
+   */
+  async getSavedWatchlist(): Promise<SavedWatchlistResponse> {
+    return this.fetch<SavedWatchlistResponse>("/alerts/watchlist");
+  }
+
+  async saveWatchlist(symbols: string[]): Promise<SavedWatchlistResponse> {
+    return this.fetch<SavedWatchlistResponse>("/alerts/watchlist", {
+      method: "PUT",
+      body: JSON.stringify({ symbols }),
+    });
+  }
+
+  async setAlertsEnabled(symbol: string, enabled: boolean): Promise<SavedWatchlistResponse> {
+    return this.fetch<SavedWatchlistResponse>(`/alerts/watchlist/${encodeURIComponent(symbol)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ alerts_enabled: enabled }),
+    });
+  }
+
+  /**
+   * Recent consensus changes, newest first
+   */
+  async getAlertEvents(limit: number = 20): Promise<AlertEventsResponse> {
+    return this.fetch<AlertEventsResponse>(`/alerts/events?limit=${limit}`);
+  }
+
+  /**
+   * Run the watchlist signal check now
+   */
+  async checkAlertsNow(limit: number = 20): Promise<AlertEventsResponse> {
+    return this.fetch<AlertEventsResponse>(`/alerts/check?limit=${limit}`, { method: "POST" });
   }
 
   // ── Sector Rotation Methods ───────────────────────────────

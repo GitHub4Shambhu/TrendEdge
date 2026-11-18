@@ -106,6 +106,10 @@ Access the application:
 | `/api/v1/dashboard/` | GET | Main dashboard with top opportunities |
 | `/api/v1/dashboard/stocks` | GET | Momentum scores for specific stocks |
 | `/api/v1/dashboard/symbol/{symbol}` | GET | Detailed analysis for single symbol |
+| `/api/v1/alerts/watchlist` | GET / PUT | Saved watchlist (what the alert check scores) |
+| `/api/v1/alerts/watchlist/{symbol}` | PATCH | Turn signal-change alerts on/off for one symbol |
+| `/api/v1/alerts/events` | GET | Recent consensus changes, newest first |
+| `/api/v1/alerts/check` | POST | Run the watchlist signal check now |
 | `/health` | GET | Health check |
 
 ## Momentum Algorithm
@@ -132,6 +136,22 @@ DEBUG=true
 ALPHA_VANTAGE_API_KEY=your_key
 POLYGON_API_KEY=your_key
 CORS_ORIGINS=["http://localhost:3000"]
+```
+
+### Watchlist signal alerts
+
+While the US market is open, the backend re-scores the saved watchlist every
+`ALERT_CHECK_MINUTES` and records an alert whenever a ticker's multi-engine
+consensus changes (e.g. BULLISH → BEARISH). The first check only records a
+baseline, and results built on stale/mock data are ignored. Alerts show in the
+Watchlist's "Recent signal changes" feed and, if a webhook is set, are posted
+to Slack or Discord.
+
+```env
+ALERT_CHECK_ENABLED=true
+ALERT_CHECK_MINUTES=30
+ALERT_WEBHOOK_URL=https://hooks.slack.com/services/...   # optional
+ALERTS_DB_PATH=data/trendedge.db                          # SQLite, relative to backend/
 ```
 
 ## Development

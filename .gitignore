@@ -64,3 +64,6 @@ htmlcov/
 
 # Do not ignore frontend/src/lib
 !frontend/src/lib/
+
+# Local SQLite data (watchlist & alerts)
+backend/data/

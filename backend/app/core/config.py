@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     momentum_threshold: float = 0.02
     sentiment_weight: float = 0.3
 
+    # Watchlist Signal Alerts
+    alerts_db_path: str = "data/trendedge.db"
+    alert_check_enabled: bool = True
+    alert_check_minutes: int = 30
+    alert_webhook_url: str = ""  # Slack or Discord incoming webhook
+
     @property
     def is_development(self) -> bool:
         return self.environment == "development"

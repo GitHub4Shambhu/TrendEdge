@@ -7,13 +7,15 @@ All routes, middleware, and startup events are configured here.
 To run: uvicorn app.main:app --reload --port 8000
 """
 
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 from datetime import datetime
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import api_router
+from app.api.alerts import run_alert_scheduler
 from app.core.config import get_settings
 from app.schemas.momentum import HealthResponse
 
@@ -23,8 +25,15 @@ async def lifespan(app: FastAPI):
     """Application lifespan handler for startup/shutdown events."""
     # Startup
     print("🚀 TrendEdge API starting up...")
+    scheduler = None
+    if get_settings().alert_check_enabled:
+        scheduler = asyncio.create_task(run_alert_scheduler())
     yield
     # Shutdown
+    if scheduler:
+        scheduler.cancel()
+        with suppress(asyncio.CancelledError):
+            await scheduler
     print("👋 TrendEdge API shutting down...")
 
 
